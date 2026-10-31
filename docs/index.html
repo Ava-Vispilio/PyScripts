@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Autumn Moon: an unofficial parody</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+        background: #000;
+        color: #ddd;
+        font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      }
+      main {
+        max-width: 46rem;
+        margin: 0 auto;
+        padding: 1.5rem 1rem 3rem;
+      }
+      h1 {
+        color: #f5b942;
+        font-size: 1.3rem;
+        text-align: center;
+        letter-spacing: 0.1em;
+      }
+      #meters {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.5rem;
+        text-align: center;
+        margin-bottom: 1rem;
+      }
+      #meters div {
+        border: 1px solid #333;
+        padding: 0.4rem;
+      }
+      #meters span {
+        display: block;
+        font-size: 0.75rem;
+        letter-spacing: 0.15em;
+      }
+      .m-grand { color: #ff5a5a; }
+      .m-major { color: #d77bff; }
+      .m-minor { color: #5aa0ff; }
+      .m-mini { color: #6fdc6f; }
+      #board {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 4px;
+        border: 2px solid #5a3b12;
+        padding: 4px;
+        background: #0b0b0b;
+      }
+      .tile {
+        height: 3.4rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #141414;
+        font-weight: bold;
+        font-size: 0.95rem;
+      }
+      .t-card { color: #e6e6e6; }
+      .t-fan { color: #f2c94c; }
+      .t-koi { color: #ff7a59; }
+      .t-lotus { color: #ff8fd1; }
+      .t-dragon { color: #ff5a5a; }
+      .t-wild { color: #f5b942; }
+      .t-moon { color: #ffe066; background: #26200a; }
+      .t-orb { color: #ff9d2e; background: #2a1600; }
+      .t-jackpot { color: #e08bff; background: #22072e; }
+      .t-door { color: #7aa7ff; background: #0c1a33; }
+      .t-blank { color: #333; }
+      .look-spinning { color: #444; background: #101010; }
+      .look-spinning::after { content: "▒▒▒"; }
+      .look-locked { outline: 1px solid currentColor; }
+      .look-win { filter: invert(1); }
+      #stats {
+        display: flex;
+        justify-content: space-between;
+        margin: 1rem 0 0.5rem;
+      }
+      #stats b { color: #fff; }
+      #banner {
+        min-height: 1.5em;
+        text-align: center;
+        color: #ffe066;
+        font-weight: bold;
+        letter-spacing: 0.08em;
+      }
+      #prompt {
+        text-align: center;
+        color: #888;
+        font-size: 0.85rem;
+        min-height: 1.3em;
+      }
+      nav {
+        display: flex;
+        gap: 0.5rem;
+        justify-content: center;
+        margin: 1rem 0 2rem;
+      }
+      button {
+        font: inherit;
+        background: #1c1c1c;
+        color: #eee;
+        border: 1px solid #555;
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+      }
+      button:disabled { opacity: 0.4; cursor: default; }
+      body[data-prompt="spin"] button[data-action="spin"],
+      body[data-prompt="confirm"] button[data-action="confirm"] {
+        border-color: #f5b942;
+        color: #f5b942;
+      }
+      article {
+        border-top: 1px solid #333;
+        line-height: 1.55;
+        font-size: 0.9rem;
+      }
+      article h2 { color: #f5b942; font-size: 1rem; }
+      table { border-collapse: collapse; margin-top: 1rem; }
+      th, td { border: 1px solid #333; padding: 0.25rem 0.6rem; text-align: right; }
+      th:first-child { text-align: left; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>AUTUMN MOON · unofficial parody</h1>
+      <section id="meters">
+        <div class="m-grand"><span>GRAND</span><b id="grand"></b></div>
+        <div class="m-major"><span>MAJOR</span><b id="major"></b></div>
+        <div class="m-minor"><span>MINOR</span><b id="minor"></b></div>
+        <div class="m-mini"><span>MINI</span><b id="mini"></b></div>
+      </section>
+      <div id="board"></div>
+      <section id="stats">
+        <span>CREDITS <b id="credits"></b></span>
+        <span>BET <b id="bet"></b></span>
+        <span>WIN <b id="win"></b></span>
+      </section>
+      <div id="banner"></div>
+      <div id="prompt"></div>
+      <nav>
+        <button data-action="coinDown">COIN −</button>
+        <button data-action="spin">SPIN</button>
+        <button data-action="confirm">COLLECT</button>
+        <button data-action="coinUp">COIN +</button>
+      </nav>
+      <article id="rules">
+<h2>What this is</h2>
+<p>This is an unofficial parody of Aristocrat's Dragon Link Autumn Moon. Aristocrat did not make it and does not endorse it.</p>
+<p>It grew out of the Alberta Tech reel "Vibe Coding is Gambling" and Dave Eddy's YSAP Link stitch of that reel.</p>
+<p>Nothing here is real wagering. Credits are pretend, cost nothing, and cannot be cashed out.</p>
+<p>A text screen has no cabinet art, no sound, and no linked jackpot. The Major and Grand meters grow only from your own spins in this session.</p>
+<h2>Rules of this version</h2>
+<p>Coin 1. Every credit amount below is for this coin and changes when you change the coin.</p>
+<ul>
+  <li>5 reels, 3 rows, 50 fixed lines. Lines pay left to right, starting on the first reel. The bet is 50 credits: 50 lines times the coin. You start with 50,000 credits.</li>
+  <li>WILD lands on every reel except the first. It stands in for every paying symbol. It does not stand in for MOON or ORB, and ORB never pays on a line.</li>
+  <li>MOON pays anywhere on the screen. Three moons pay 150, four pay 1,000, and five pay 12,500, which is 250 times the bet. Three or more moons also start 6 free games. Three more moons during free games add 6 more.</li>
+  <li>Free spins can land DOOR stacks. Every door on one spin opens onto the same symbol. That symbol can be ORB, but never WILD or MOON.</li>
+  <li>6 or more ORB start Hold and Spin with 3 respins. Each new orb locks and resets the count to 3. Orbs show credits (50, 100, 150, 250, 400, 750) or a jackpot name. Only one MAJOR can show at a time.</li>
+  <li>MINI pays 1,000. MINOR pays 5,000. MAJOR pays its meter, which starts at 25,000. Filling all 15 cells pays the GRAND meter, which starts at 250,000. Both meters grow a little with every paid spin and reset after they pay.</li>
+  <li>A Major or Grand win pauses the game until you collect it. Spin does nothing during that pause.</li>
+  <li>Hold and Spin started during free games returns to those free games.</li>
+  <li>The coin changes only in the base game.</li>
+  <li>Reel strips, weights, and odds are original to this parody and are not Aristocrat's math.</li>
+</ul>
+<table>
+  <thead><tr><th>Line pays</th><th>Three</th><th>Four</th><th>Five</th></tr></thead>
+  <tbody>
+<tr><th>9</th><td>5</td><td>15</td><td>80</td></tr>
+<tr><th>10</th><td>5</td><td>15</td><td>90</td></tr>
+<tr><th>J</th><td>5</td><td>20</td><td>100</td></tr>
+<tr><th>Q</th><td>10</td><td>25</td><td>120</td></tr>
+<tr><th>K</th><td>10</td><td>30</td><td>150</td></tr>
+<tr><th>FAN</th><td>15</td><td>50</td><td>200</td></tr>
+<tr><th>KOI</th><td>20</td><td>60</td><td>250</td></tr>
+<tr><th>LOTUS</th><td>25</td><td>80</td><td>300</td></tr>
+<tr><th>DRGN</th><td>40</td><td>150</td><td>800</td></tr>
+  </tbody>
+</table></article>
+    </main>
+    <script src="./main.js" defer></script>
+  </body>
+</html>

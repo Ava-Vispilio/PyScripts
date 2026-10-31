@@ -4,6 +4,8 @@
   "type": "module",
   "scripts": {
     "test": "bun test",
+    "tui": "bun src/tui/main.ts",
+    "build": "bun scripts/build.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
