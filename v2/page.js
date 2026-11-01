@@ -1,0 +1,408 @@
+// src/game.ts
+var PAYING = ["9", "10", "J", "Q", "K", "FAN", "KOI", "LOTUS", "DRGN"];
+var LINE = {
+  "9": { 3: 5, 4: 15, 5: 80 },
+  "10": { 3: 5, 4: 15, 5: 90 },
+  J: { 3: 5, 4: 20, 5: 100 },
+  Q: { 3: 10, 4: 25, 5: 120 },
+  K: { 3: 10, 4: 30, 5: 150 },
+  FAN: { 3: 15, 4: 50, 5: 200 },
+  KOI: { 3: 20, 4: 60, 5: 250 },
+  LOTUS: { 3: 25, 4: 80, 5: 300 },
+  DRGN: { 3: 40, 4: 150, 5: 800 }
+};
+var COINS = [1, 2, 5, 10];
+var BASE_HOLD = "FEATURE: Collect 6 or more ORB symbols for HOLD & SPIN.";
+var HOLD_RULE = "FEATURE: Reset to 3 respins whenever a new ORB lands.";
+var REEL0 = ["9", "10", "J", "Q", "K", "9", "10", "FAN", "KOI", "LOTUS", "DRGN", "MOON", "ORB", "Q", "K", "9"];
+var REEL = ["9", "10", "J", "Q", "K", "WILD", "FAN", "KOI", "LOTUS", "DRGN", "MOON", "ORB", "9", "10", "J", "Q"];
+var DOORS = ["9", "10", "J", "Q", "K", "FAN", "KOI", "LOTUS", "DRGN", "ORB", "ORB", "FAN"];
+var FACES = [
+  { label: "50", coins: 50, weight: 30 },
+  { label: "100", coins: 100, weight: 24 },
+  { label: "150", coins: 150, weight: 14 },
+  { label: "250", coins: 250, weight: 9 },
+  { label: "400", coins: 400, weight: 5 },
+  { label: "750", coins: 750, weight: 2 },
+  { label: "MINI", coins: 1000, weight: 5 },
+  { label: "MINOR", coins: 5000, weight: 1.5 },
+  { label: "MAJOR", coins: 0, weight: 0.3, major: true }
+];
+function bends(line) {
+  let n = 0;
+  for (let i = 1;i < line.length; i++) {
+    const step = Math.abs((line[i] ?? 0) - (line[i - 1] ?? 0));
+    if (step > 1)
+      return -1;
+    if (step === 1)
+      n++;
+  }
+  return n;
+}
+var LINES = [];
+for (let a = 0;a < 3; a++)
+  for (let b = 0;b < 3; b++)
+    for (let c = 0;c < 3; c++)
+      for (let d = 0;d < 3; d++)
+        for (let e = 0;e < 3; e++) {
+          const line = [a, b, c, d, e];
+          if (bends(line) >= 0)
+            LINES.push(line);
+        }
+LINES.sort((x, y) => bends(x) - bends(y));
+LINES.length = 50;
+var row = (a, b, c, d, e) => [a, b, c, d, e];
+var flat = (grid) => grid.flat();
+var isPaying = (s) => PAYING.includes(s);
+function pick(rng, items) {
+  return items[Math.floor(rng() * items.length)];
+}
+function drawStrip(rng, free) {
+  const grid = [0, 1, 2].map(() => [0, 1, 2, 3, 4].map((reel) => pick(rng, reel === 0 ? REEL0 : REEL)));
+  if (!free)
+    return grid;
+  let doors = 0;
+  const opened = grid.map((line) => line.map((symbol) => {
+    if (rng() < 0.28) {
+      doors++;
+      return "DOOR";
+    }
+    return symbol;
+  }));
+  if (doors === 0)
+    opened[0][0] = "DOOR";
+  return opened;
+}
+function rollFace(rng, allowMajor) {
+  const pool = FACES.filter((face) => allowMajor || !face.major);
+  const total = pool.reduce((sum, face) => sum + face.weight, 0);
+  let roll = rng() * total;
+  for (const face of pool) {
+    roll -= face.weight;
+    if (roll <= 0)
+      return { label: face.label, pay: face.coins };
+  }
+  const last = pool[pool.length - 1];
+  return { label: last.label, pay: last.coins };
+}
+function live(rng = Math.random) {
+  return {
+    window: (free) => drawStrip(rng, free),
+    door: () => pick(rng, DOORS),
+    face: (allowMajor) => rollFace(rng, allowMajor),
+    locks: (open) => Array.from({ length: open }, () => rng() < 0.22)
+  };
+}
+function newPlay() {
+  return show({
+    credits: 50000,
+    coin: 1,
+    major: 25000,
+    grand: 250000,
+    win: 0,
+    rows: [
+      row("DRGN", "MOON", "ORB", "LOTUS", "FAN"),
+      row("KOI", "LOTUS", "DRGN", "MOON", "ORB"),
+      row("9", "WILD", "FAN", "K", "DRGN")
+    ],
+    phase: { kind: "base" }
+  });
+}
+function show(play) {
+  const feature = play.feature ?? featureOf(play.phase);
+  const status = play.status ?? "Press Enter to spin.";
+  return { ...play, feature, status };
+}
+function featureOf(phase) {
+  if (phase.kind === "free" || phase.kind === "doors") {
+    return `FEATURE: Every door opens onto the same symbol. ${phase.left} free games left.`;
+  }
+  if (phase.kind === "hold" || phase.kind === "arm" || phase.kind === "jackpot")
+    return HOLD_RULE;
+  return BASE_HOLD;
+}
+function betOf(play) {
+  return 50 * play.coin;
+}
+function act(play, key, chance) {
+  if (key !== "spin")
+    return play.phase.kind === "base" ? changeCoin(play, key) : play;
+  switch (play.phase.kind) {
+    case "base":
+      return spinBase(play, chance);
+    case "free":
+      return spinFree(play, play.phase, chance);
+    case "doors":
+      return openDoors(play, play.phase);
+    case "arm":
+      return beginHold(play, play.phase, chance);
+    case "hold":
+      return respin(play, play.phase, chance);
+    case "jackpot":
+      return collect(play, play.phase);
+  }
+}
+function changeCoin(play, key) {
+  const index = COINS.indexOf(play.coin);
+  const next = COINS[index + (key === "coinUp" ? 1 : -1)];
+  if (next === undefined)
+    return play;
+  return show({ ...play, coin: next, win: 0 });
+}
+function spinBase(play, chance) {
+  const bet = betOf(play);
+  if (play.credits < bet)
+    return show({ ...play, status: "Not enough credits for this bet." });
+  const grid = chance.window(false);
+  const paid = { ...play, credits: play.credits - bet, major: play.major + 50 * 0.01, grand: play.grand + 50 * 0.004 };
+  return settle(paid, grid, { kind: "base" });
+}
+function spinFree(play, phase, chance) {
+  const left = phase.left - 1;
+  const grid = chance.window(true);
+  if (flat(grid).includes("DOOR")) {
+    return show({
+      ...play,
+      rows: grid,
+      win: 0,
+      phase: { kind: "doors", left, face: chance.door(), under: grid },
+      status: "Press Enter to open the doors."
+    });
+  }
+  return settle(play, grid, { kind: "free", left });
+}
+function openDoors(play, phase) {
+  const grid = phase.under.map((line) => line.map((symbol) => symbol === "DOOR" ? phase.face : symbol));
+  return settle({ ...play, rows: grid }, grid, { kind: "free", left: phase.left });
+}
+function settle(play, grid, resume) {
+  const score = scoreGrid(grid, play.coin);
+  const credits = play.credits + score.pay;
+  const left = resume.kind === "free" ? resume.left + (score.moons >= 3 ? 6 : 0) : score.moons >= 3 ? 6 : 0;
+  const next = left > 0 ? { kind: "free", left } : { kind: "base" };
+  const shown = show({
+    ...play,
+    credits,
+    rows: grid,
+    win: score.pay,
+    phase: next.kind === "free" ? { kind: "free", left: next.left } : { kind: "base" },
+    feature: next.kind === "free" ? featureOf({ kind: "free", left: next.left }) : BASE_HOLD,
+    status: "Press Enter to spin."
+  });
+  if (score.orbs < 6)
+    return shown;
+  return show({
+    ...shown,
+    phase: { kind: "arm", under: grid, resume: next },
+    feature: HOLD_RULE,
+    status: "Six orbs landed. Press Enter to start Hold & Spin."
+  });
+}
+function scoreGrid(grid, coin) {
+  let coins = 0;
+  for (const line of LINES) {
+    const symbol = grid[line[0]][0];
+    if (!isPaying(symbol))
+      continue;
+    let run = 1;
+    for (let reel = 1;reel < 5; reel++) {
+      const symbolOnLine = grid[line[reel]][reel];
+      if (symbolOnLine === symbol || symbolOnLine === "WILD")
+        run++;
+      else
+        break;
+    }
+    if (run >= 3)
+      coins += LINE[symbol][run >= 5 ? 5 : run];
+  }
+  const moons = flat(grid).filter((symbol) => symbol === "MOON").length;
+  const moonCoins = moons >= 5 ? 250 * 50 : moons === 4 ? 20 * 50 : moons >= 3 ? 3 * 50 : 0;
+  return { pay: (coins + moonCoins) * coin, moons, orbs: flat(grid).filter((symbol) => symbol === "ORB").length };
+}
+function beginHold(play, phase, chance) {
+  let major = false;
+  const locked = phase.under.map((line) => line.map((symbol) => {
+    if (symbol !== "ORB")
+      return null;
+    const face = chance.face(!major);
+    if (face.label === "MAJOR")
+      major = true;
+    return face;
+  }));
+  return landHold(play, locked, phase.under, 3, phase.resume);
+}
+function respin(play, phase, chance) {
+  const open = [];
+  phase.locked.forEach((line, r) => line.forEach((cell, c) => cell === null && open.push([r, c])));
+  const hits = chance.locks(open.length);
+  let major = phase.locked.some((line) => line.some((cell) => cell?.label === "MAJOR"));
+  const locked = phase.locked.map((line) => line.slice());
+  let landed = 0;
+  open.forEach(([r, c], i) => {
+    if (!hits[i])
+      return;
+    const face = chance.face(!major);
+    if (face.label === "MAJOR")
+      major = true;
+    locked[r][c] = face;
+    landed++;
+  });
+  const respins = landed > 0 ? 3 : phase.respins - 1;
+  return landHold(play, locked, phase.under, respins, phase.resume);
+}
+function landHold(play, locked, under, respins, resume) {
+  const rows = locked.map((line, r) => line.map((cell, c) => cell ? faceLabel(cell, play.coin) : under[r][c]));
+  const win = holdWin(locked, play.coin);
+  const full = locked.every((line) => line.every((cell) => cell !== null));
+  if (respins > 0 && !full) {
+    return show({
+      ...play,
+      rows,
+      win,
+      phase: { kind: "hold", respins, locked, under, resume },
+      feature: HOLD_RULE,
+      status: `Press Enter for hold-and-spin respin ${respins}.`
+    });
+  }
+  return finish(play, locked, under, rows, win, resume, full);
+}
+function faceLabel(face, coin) {
+  if (face.label === "MINI" || face.label === "MINOR" || face.label === "MAJOR")
+    return face.label;
+  return String(face.pay * coin);
+}
+function holdWin(locked, coin) {
+  return locked.flat().reduce((sum, cell) => sum + (cell && cell.label !== "MAJOR" ? cell.pay * coin : 0), 0);
+}
+function finish(play, locked, under, rows, win, resume, full) {
+  const pending = [];
+  let major = play.major;
+  let grand = play.grand;
+  if (locked.some((line) => line.some((cell) => cell?.label === "MAJOR"))) {
+    pending.push({ name: "MAJOR", amount: Math.floor(major * play.coin) });
+    major = 25000;
+  }
+  if (full) {
+    pending.push({ name: "GRAND", amount: Math.floor(grand * play.coin) });
+    grand = 250000;
+  }
+  const credits = play.credits + win;
+  if (pending.length === 0)
+    return returned({ ...play, credits, major, grand, rows, win }, resume);
+  const first = pending[0];
+  return show({
+    ...play,
+    credits,
+    major,
+    grand,
+    rows,
+    win,
+    phase: { kind: "jackpot", pending, locked, under, resume },
+    feature: HOLD_RULE,
+    status: `${first.name} ${first.amount.toLocaleString("en-US")}. Press Enter to collect.`
+  });
+}
+function collect(play, phase) {
+  const [head, ...rest] = phase.pending;
+  const credits = play.credits + (head?.amount ?? 0);
+  if (rest.length > 0 && head) {
+    const next = rest[0];
+    return show({
+      ...play,
+      credits,
+      phase: { ...phase, pending: rest },
+      status: `${next.name} ${next.amount.toLocaleString("en-US")}. Press Enter to collect.`
+    });
+  }
+  return returned({ ...play, credits, win: 0 }, phase.resume);
+}
+function returned(play, resume) {
+  if (resume.kind === "free") {
+    return show({
+      ...play,
+      phase: { kind: "free", left: resume.left },
+      feature: featureOf({ kind: "free", left: resume.left }),
+      status: "Press Enter to spin."
+    });
+  }
+  return show({ ...play, phase: { kind: "base" }, feature: BASE_HOLD, status: "Press Enter to spin." });
+}
+function rulesText(coin) {
+  const bet = 50 * coin;
+  const money = (coins) => Math.floor(coins * coin).toLocaleString("en-US");
+  return [
+    "This is an unofficial parody of Aristocrat's Dragon Link Autumn Moon.",
+    `It grew out of the Alberta Tech reel "Vibe Coding is Gambling" and Dave Eddy's YSAP Link stitch.`,
+    "Credits are pretend. Reel odds are original to this parody.",
+    `Coin ${coin}. Bet ${money(50)}. Five moons pay ${money(250 * 50)}.`,
+    "Six ORB symbols start Hold & Spin. A new orb resets the count to three. Fifteen orbs pay Grand."
+  ].join(`
+`);
+}
+
+// src/text.ts
+var WIDTH = 14;
+function commas(n) {
+  return Math.floor(n).toLocaleString("en-US");
+}
+function cell(label) {
+  return `[ ${label.padEnd(5)} ]`;
+}
+function plain(play) {
+  const bet = 50 * play.coin;
+  const meter = (coins) => commas(coins * play.coin);
+  const head = ["MINI", "MINOR", "MAJOR", "GRAND"].map((name) => name.padEnd(WIDTH)).join("");
+  const values = [meter(1000), meter(5000), meter(play.major), meter(play.grand)].map((value) => value.padEnd(WIDTH)).join("");
+  const rows = play.rows.map((row) => row.map(cell).join("  ")).join(`
+`);
+  return [
+    "AUTUMN MOON",
+    "",
+    head.trimEnd(),
+    values.trimEnd(),
+    "",
+    rows,
+    "",
+    `credits: ${commas(play.credits)}     bet: ${commas(bet)}     win: ${commas(play.win)}`,
+    play.feature,
+    play.status
+  ].join(`
+`);
+}
+
+// src/page.ts
+function need(id) {
+  const el = document.querySelector(id);
+  if (!(el instanceof HTMLElement))
+    throw new Error("missing page");
+  return el;
+}
+var board = need("#screen");
+var bar = need("#status");
+var copy = need("#rules");
+var play = newPlay();
+var chance = live(seeded(1));
+function draw(next) {
+  const text = plain(next);
+  const cut = text.lastIndexOf(`
+`);
+  board.textContent = text.slice(0, cut);
+  bar.textContent = text.slice(cut + 1);
+  copy.textContent = rulesText(next.coin);
+}
+function seeded(seed) {
+  let state = seed >>> 0;
+  return () => {
+    state = state * 1664525 + 1013904223 >>> 0;
+    return state / 2 ** 32;
+  };
+}
+draw(play);
+document.addEventListener("keydown", (event) => {
+  const key = event.key === "Enter" || event.key === " " ? "spin" : event.key === "ArrowRight" ? "coinUp" : event.key === "ArrowLeft" ? "coinDown" : null;
+  if (!key)
+    return;
+  event.preventDefault();
+  play = act(play, key, chance);
+  draw(play);
+});

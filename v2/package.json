@@ -1,0 +1,13 @@
+{
+  "name": "autumn-moon-v2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bun test",
+    "tui": "bun src/tui.ts",
+    "page": "bun build src/page.ts --outfile page.js --target browser --format esm"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.4"
+  }
+}
