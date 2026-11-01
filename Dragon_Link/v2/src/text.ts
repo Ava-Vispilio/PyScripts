@@ -25,7 +25,7 @@ export type Bar = "play" | "win" | "free" | "door" | "hold" | "major" | "grand" 
 
 export type Picture = {
   meters: { name: string; value: string; tone: Tone; look: Look }[];
-  /** A bar directly above the columns. Empty once the reels have stopped. */
+  /** The row above the reels. Spinning, a win, and a feature callout share it. */
   spin: string;
   rows: Cell[][];
   credits: string;
@@ -72,7 +72,14 @@ function box(label: string): string {
   return `[ ${center(label, 5)} ]`;
 }
 
-const BOARD = 63;
+const BOARD = 53;
+
+/** Four jackpot columns, the same width as the five reels. */
+function spread(parts: string[]): string {
+  const widths = [13, 12, 13, 12];
+  return parts.map((part, i) => center(part, widths[i] ?? 12)).join(" ");
+}
+
 const REEL0 = ["9", "10", "J", "Q", "K", "FAN", "KOI", "LOTUS", "DRGN", "MOON", "ORB"];
 const REEL = ["9", "10", "J", "Q", "K", "WILD", "FAN", "KOI", "LOTUS", "DRGN", "MOON", "ORB"];
 const FACES = ["50", "100", "150", "250", "400", "750", "MINI", "MINOR", "MAJOR"];
@@ -114,14 +121,14 @@ function lockedAt(play: Play, r: number, c: number): boolean {
   return phase.locked[r]?.[c] != null;
 }
 
-/** The screen from the video, as plain text. The last line is the red bar. */
+/** The screen from the video, as plain text. The last line is the status bar. */
 export function plain(play: Play): string {
   const bet = 50 * play.coin;
   const meter = (coins: number) => commas(coins * play.coin);
-  const head = ["MINI", "MINOR", "MAJOR", "GRAND"].map((name) => center(name, 14)).join("");
-  const values = [meter(1000), meter(5000), meter(play.major), meter(play.grand)].map((value) => center(value, 14)).join("");
+  const head = spread(["MINI", "MINOR", "MAJOR", "GRAND"]);
+  const values = spread([meter(1000), meter(5000), meter(play.major), meter(play.grand)]);
   const rows = play.rows.map((row) => row.map(box).join("  ")).join("\n");
-  return ["AUTUMN MOON", "", head.trimEnd(), values.trimEnd(), "", rows, "", `credits: ${commas(play.credits)}     bet: ${commas(bet)}     win: ${commas(play.win)}`, play.feature, play.status].join("\n");
+  return ["AUTUMN MOON", "", head, values, "", rows, "", `credits: ${commas(play.credits)}     bet: ${commas(bet)}     win: ${commas(play.win)}`, play.feature, play.status].join("\n");
 }
 
 function callout(play: Play): { banner: string; bannerTone: Tone } {
@@ -171,16 +178,17 @@ export function picture(play: Play): Picture {
       return { text: box(label), tone: dim ? "dim" : toneOf(label), look };
     }),
   );
+  const note = callout(play);
   return {
     meters: [...meters],
     rows,
     credits: `credits: ${commas(play.credits)}     bet: ${commas(bet)}     win: ${commas(play.win)}`,
     feature: play.feature,
     status: play.status,
-    spin: "",
+    spin: note.banner ? center(note.banner, BOARD) : "",
     bar: barOf(play),
     wait: 0,
-    ...callout(play),
+    ...note,
   };
 }
 
@@ -277,23 +285,15 @@ const BAR: Record<Bar, string> = {
 
 /** The picture as terminal color. The status line takes its color from the feature. */
 export function ansi(pic: Picture): string {
-  const col = (text: string, tone: Tone, look: Look) => paint(SGR[tone] + LOOK[look], center(text, 14));
-  const meters = pic.meters.map((meter) => col(meter.name, meter.tone, "still")).join("");
-  const values = pic.meters.map((meter) => col(meter.value, meter.tone, meter.look)).join("");
+  const width = [13, 12, 13, 12];
+  const col = (text: string, tone: Tone, look: Look, i: number) => paint(SGR[tone] + LOOK[look], center(text, width[i] ?? 12));
+  const meters = pic.meters.map((meter, i) => col(meter.name, meter.tone, "still", i)).join(" ");
+  const values = pic.meters.map((meter, i) => col(meter.value, meter.tone, meter.look, i)).join(" ");
   const rows = pic.rows.map((line) => line.map((cell) => paint(SGR[cell.tone] + LOOK[cell.look], cell.text)).join("  ")).join("\n");
-  const lines = [
-    paint(SGR.gold, "AUTUMN MOON"),
-    "",
-    meters.trimEnd(),
-    values.trimEnd(),
-    pic.spin ? paint(BAR.spin, pic.spin) : "",
-    rows,
-    "",
-    paint("37", pic.credits),
-    ...(pic.banner ? [paint(SGR[pic.bannerTone] + ";1", pic.banner)] : []),
-    paint("33", pic.feature),
-  ];
-  return `\x1b[H\x1b[J${lines.join("\n")}\n${paint(BAR[pic.bar], pic.status.padEnd(72))}\n`;
+  const aboveCode = pic.bar === "spin" ? BAR.spin : SGR[pic.bannerTone] + ";1";
+  const above = pic.spin ? paint(aboveCode, center(pic.spin.trim(), BOARD)) : "";
+  const lines = [paint(SGR.gold, "AUTUMN MOON"), "", meters, values, above, rows, "", paint("37", pic.credits), paint("33", pic.feature)];
+  return `\x1b[H\x1b[J${lines.join("\n")}\n${paint(BAR[pic.bar], center(pic.status, BOARD))}\n`;
 }
 
 function esc(text: string): string {
@@ -306,11 +306,13 @@ function span(text: string, tone: Tone, look: Look): string {
 
 /** The picture as colored text. The page paints the status bar itself. */
 export function markup(pic: Picture): string {
-  const col = (text: string, tone: Tone, look: Look) => span(center(text, 14), tone, look);
-  const meters = pic.meters.map((meter) => col(meter.name, meter.tone, "still")).join("");
-  const values = pic.meters.map((meter) => col(meter.value, meter.tone, meter.look)).join("");
+  const width = [13, 12, 13, 12];
+  const col = (text: string, tone: Tone, look: Look, i: number) => span(center(text, width[i] ?? 12), tone, look);
+  const meters = pic.meters.map((meter, i) => col(meter.name, meter.tone, "still", i)).join(" ");
+  const values = pic.meters.map((meter, i) => col(meter.value, meter.tone, meter.look, i)).join(" ");
   const rows = pic.rows.map((line) => line.map((cell) => span(cell.text, cell.tone, cell.look)).join("  ")).join("\n");
-  const spin = pic.spin ? `<span class="spinbar">${esc(pic.spin)}</span>` : "";
-  const banner = pic.banner ? `${span(pic.banner, pic.bannerTone, "still")}\n` : "";
-  return `${span("AUTUMN MOON", "gold", "still")}\n\n${meters.trimEnd()}\n${values.trimEnd()}\n${spin}\n${rows}\n\n${span(pic.credits, "card", "still")}\n${banner}${span(pic.feature, "gold", "still")}`;
+  const label = pic.spin.trim();
+  const spinClass = pic.bar === "spin" ? "spinbar" : pic.bannerTone;
+  const spin = label ? `<span class="${spinClass}">${esc(center(label, BOARD))}</span>` : "";
+  return `${span("AUTUMN MOON", "gold", "still")}\n\n${meters}\n${values}\n${spin}\n${rows}\n\n${span(pic.credits, "card", "still")}\n${span(pic.feature, "gold", "still")}`;
 }

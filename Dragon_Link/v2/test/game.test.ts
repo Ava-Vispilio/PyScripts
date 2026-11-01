@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { act, hotCells, live, newPlay, rulesHtml, scripted, type Face, type Row, type Rows } from "../src/game";
-import { frames, picture, plain } from "../src/text";
+import { frames, markup, picture, plain } from "../src/text";
 
 const row = (a: string, b: string, c: string, d: string, e: string): Row => [a, b, c, d, e];
 const grid = (cells: string[]): Rows => [
@@ -13,6 +13,9 @@ const face = (label: string, pay: number): Face => ({ label, pay });
 test("the screen is the terminal text", () => {
   const text = plain(newPlay());
   expect(text.startsWith("AUTUMN MOON\n")).toBe(true);
+  const lines = text.split("\n");
+  expect(lines[2]).toHaveLength(53);
+  expect(lines[5]).toHaveLength(53);
   expect(text).toContain("[ DRGN  ]  [ MOON  ]  [  ORB  ]  [ LOTUS ]  [  FAN  ]");
   expect(text).toContain("credits: 50,000     bet: 50     win: 0");
   expect(text.endsWith("Press Enter to spin.")).toBe(true);
@@ -83,14 +86,15 @@ test("winning cells light up and the reels stop one at a time", () => {
   expect(pics.length).toBeGreaterThan(5);
   expect(pics[0]!.spin.trim()).toBe("SPINNING");
   expect(pics[0]!.bar).toBe("spin");
+  expect(markup(pics[0]!).split("\n").length).toBe(markup(picture(start)).split("\n").length);
   expect(pics[0]!.rows[0]![4]!.look).toBe("spin");
   expect(pics[0]!.wait).toBeLessThan(pics.at(-2)!.wait);
   const settled = pics.find((pic) => pic.rows[0]![0]!.look === "still" && pic.rows[0]![4]!.look === "spin");
   expect(settled).toBeTruthy();
   expect(pics.at(-1)!.rows[0]![0]!.look).toBe("win");
-  expect(pics.at(-1)!.banner).toBe("WINNER");
+  expect(pics.at(-1)!.spin.trim()).toBe("WINNER");
   expect(pics.at(-1)!.bar).toBe("win");
-  expect(pics.at(-1)!.spin).toBe("");
+  expect(markup(picture(start)).split("\n").length).toBe(markup(pics.at(-1)!).split("\n").length);
   expect(picture(start).rows[0]![0]!.tone).toBe("dragon");
   expect(picture(start).rows[0]![2]!.tone).toBe("orb");
   expect(picture(start).rows[2]![0]!.text).toBe("[   9   ]");

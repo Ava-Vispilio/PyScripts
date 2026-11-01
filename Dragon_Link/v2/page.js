@@ -404,7 +404,7 @@ function center(text, width) {
 function box(label) {
   return `[ ${center(label, 5)} ]`;
 }
-var BOARD = 63;
+var BOARD = 53;
 var REEL02 = ["9", "10", "J", "Q", "K", "FAN", "KOI", "LOTUS", "DRGN", "MOON", "ORB"];
 var REEL2 = ["9", "10", "J", "Q", "K", "WILD", "FAN", "KOI", "LOTUS", "DRGN", "MOON", "ORB"];
 var FACES2 = ["50", "100", "150", "250", "400", "750", "MINI", "MINOR", "MAJOR"];
@@ -495,16 +495,17 @@ function picture(play) {
     const look = hot[r]?.[c] ? "win" : locked || play.phase.kind === "arm" && label === "ORB" ? "lock" : "still";
     return { text: box(label), tone: dim ? "dim" : toneOf(label), look };
   }));
+  const note = callout(play);
   return {
     meters: [...meters],
     rows,
     credits: `credits: ${commas(play.credits)}     bet: ${commas(bet)}     win: ${commas(play.win)}`,
     feature: play.feature,
     status: play.status,
-    spin: "",
+    spin: note.banner ? center(note.banner, BOARD) : "",
     bar: barOf(play),
     wait: 0,
-    ...callout(play)
+    ...note
   };
 }
 function stopsFor(rows) {
@@ -580,23 +581,24 @@ function span(text, tone, look) {
   return `<span class="${tone} ${look}">${esc(text)}</span>`;
 }
 function markup(pic) {
-  const col = (text, tone, look) => span(center(text, 14), tone, look);
-  const meters = pic.meters.map((meter) => col(meter.name, meter.tone, "still")).join("");
-  const values = pic.meters.map((meter) => col(meter.value, meter.tone, meter.look)).join("");
+  const width = [13, 12, 13, 12];
+  const col = (text, tone, look, i) => span(center(text, width[i] ?? 12), tone, look);
+  const meters = pic.meters.map((meter, i) => col(meter.name, meter.tone, "still", i)).join(" ");
+  const values = pic.meters.map((meter, i) => col(meter.value, meter.tone, meter.look, i)).join(" ");
   const rows = pic.rows.map((line) => line.map((cell) => span(cell.text, cell.tone, cell.look)).join("  ")).join(`
 `);
-  const spin = pic.spin ? `<span class="spinbar">${esc(pic.spin)}</span>` : "";
-  const banner = pic.banner ? `${span(pic.banner, pic.bannerTone, "still")}
-` : "";
+  const label = pic.spin.trim();
+  const spinClass = pic.bar === "spin" ? "spinbar" : pic.bannerTone;
+  const spin = label ? `<span class="${spinClass}">${esc(center(label, BOARD))}</span>` : "";
   return `${span("AUTUMN MOON", "gold", "still")}
 
-${meters.trimEnd()}
-${values.trimEnd()}
+${meters}
+${values}
 ${spin}
 ${rows}
 
 ${span(pic.credits, "card", "still")}
-${banner}${span(pic.feature, "gold", "still")}`;
+${span(pic.feature, "gold", "still")}`;
 }
 
 // src/page.ts
