@@ -15,7 +15,11 @@ test("the screen is the terminal text", () => {
   expect(text.startsWith("AUTUMN MOON\n")).toBe(true);
   const lines = text.split("\n");
   expect(lines[2]).toHaveLength(53);
+  expect(lines[3]).toHaveLength(53);
   expect(lines[5]).toHaveLength(53);
+  const miniMid = lines[2]!.indexOf("MINI") + 1.5;
+  const numMid = lines[3]!.indexOf("1,000") + 2;
+  expect(numMid).toBeLessThanOrEqual(miniMid);
   expect(lines.at(-2)!.startsWith("TIP:")).toBe(true);
   expect(lines.at(-2)!.length).toBeLessThanOrEqual(53);
   expect(text).toContain("[ DRGN  ]  [ MOON  ]  [  ORB  ]  [ LOTUS ]  [  FAN  ]");

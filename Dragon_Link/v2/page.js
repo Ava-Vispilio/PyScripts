@@ -405,6 +405,16 @@ function box(label) {
   return `[ ${center(label, 5)} ]`;
 }
 var BOARD = 53;
+var WIDTHS = [13, 12, 13, 12];
+function under(label, value, width) {
+  const name = center(label, width);
+  const mid = Math.max(0, name.indexOf(label)) + (label.length - 1) / 2;
+  const at = Math.floor(mid - (value.length - 1) / 2);
+  if (value.length >= width)
+    return value;
+  const left = Math.max(0, Math.min(at, width - value.length));
+  return " ".repeat(left) + value + " ".repeat(width - left - value.length);
+}
 var REEL02 = ["9", "10", "J", "Q", "K", "FAN", "KOI", "LOTUS", "DRGN", "MOON", "ORB"];
 var REEL2 = ["9", "10", "J", "Q", "K", "WILD", "FAN", "KOI", "LOTUS", "DRGN", "MOON", "ORB"];
 var FACES2 = ["50", "100", "150", "250", "400", "750", "MINI", "MINOR", "MAJOR"];
@@ -584,7 +594,7 @@ function markup(pic) {
   const width = [13, 12, 13, 12];
   const col = (text, tone, look, i) => span(center(text, width[i] ?? 12), tone, look);
   const meters = pic.meters.map((meter, i) => col(meter.name, meter.tone, "still", i)).join(" ");
-  const values = pic.meters.map((meter, i) => col(meter.value, meter.tone, meter.look, i)).join(" ");
+  const values = pic.meters.map((meter, i) => span(under(meter.name, meter.value, WIDTHS[i] ?? 12), meter.tone, meter.look)).join(" ");
   const rows = pic.rows.map((line) => line.map((cell) => cell.look === "win" ? `<span class="hit">${esc(cell.text)}</span>` : span(cell.text, cell.tone, cell.look)).join("  ")).join(`
 `);
   const label = pic.spin.trim();

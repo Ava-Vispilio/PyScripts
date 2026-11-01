@@ -73,11 +73,21 @@ function box(label: string): string {
 }
 
 const BOARD = 53;
+const WIDTHS = [13, 12, 13, 12];
 
 /** Four jackpot columns, the same width as the five reels. */
 function spread(parts: string[]): string {
-  const widths = [13, 12, 13, 12];
-  return parts.map((part, i) => center(part, widths[i] ?? 12)).join(" ");
+  return parts.map((part, i) => center(part, WIDTHS[i] ?? 12)).join(" ");
+}
+
+/** The value sits on the label's center. A leftover column goes to the right, so a number does not hang past its name. */
+function under(label: string, value: string, width: number): string {
+  const name = center(label, width);
+  const mid = Math.max(0, name.indexOf(label)) + (label.length - 1) / 2;
+  const at = Math.floor(mid - (value.length - 1) / 2);
+  if (value.length >= width) return value;
+  const left = Math.max(0, Math.min(at, width - value.length));
+  return " ".repeat(left) + value + " ".repeat(width - left - value.length);
 }
 
 const REEL0 = ["9", "10", "J", "Q", "K", "FAN", "KOI", "LOTUS", "DRGN", "MOON", "ORB"];
@@ -124,9 +134,10 @@ function lockedAt(play: Play, r: number, c: number): boolean {
 /** The screen from the video, as plain text. The last line is the status bar. */
 export function plain(play: Play): string {
   const bet = 50 * play.coin;
+  const names = ["MINI", "MINOR", "MAJOR", "GRAND"];
   const meter = (coins: number) => commas(coins * play.coin);
-  const head = spread(["MINI", "MINOR", "MAJOR", "GRAND"]);
-  const values = spread([meter(1000), meter(5000), meter(play.major), meter(play.grand)]);
+  const head = spread(names);
+  const values = [meter(1000), meter(5000), meter(play.major), meter(play.grand)].map((amount, i) => under(names[i] ?? "", amount, WIDTHS[i] ?? 12)).join(" ");
   const rows = play.rows.map((row) => row.map(box).join("  ")).join("\n");
   return ["AUTUMN MOON", "", head, values, "", rows, "", `credits: ${commas(play.credits)}     bet: ${commas(bet)}     win: ${commas(play.win)}`, play.feature, play.status].join("\n");
 }
@@ -288,7 +299,7 @@ export function ansi(pic: Picture): string {
   const width = [13, 12, 13, 12];
   const col = (text: string, tone: Tone, look: Look, i: number) => paint(SGR[tone] + LOOK[look], center(text, width[i] ?? 12));
   const meters = pic.meters.map((meter, i) => col(meter.name, meter.tone, "still", i)).join(" ");
-  const values = pic.meters.map((meter, i) => col(meter.value, meter.tone, meter.look, i)).join(" ");
+  const values = pic.meters.map((meter, i) => paint(SGR[meter.tone] + LOOK[meter.look], under(meter.name, meter.value, WIDTHS[i] ?? 12))).join(" ");
   const ink = (cell: Cell) => (cell.look === "win" ? "30;107" : SGR[cell.tone] + LOOK[cell.look]);
   const rows = pic.rows.map((line) => line.map((cell) => paint(ink(cell), cell.text)).join("  ")).join("\n");
   const above = pic.spin ? paint(BAR[pic.bar], center(pic.spin.trim(), BOARD)) : "";
@@ -309,7 +320,7 @@ export function markup(pic: Picture): string {
   const width = [13, 12, 13, 12];
   const col = (text: string, tone: Tone, look: Look, i: number) => span(center(text, width[i] ?? 12), tone, look);
   const meters = pic.meters.map((meter, i) => col(meter.name, meter.tone, "still", i)).join(" ");
-  const values = pic.meters.map((meter, i) => col(meter.value, meter.tone, meter.look, i)).join(" ");
+  const values = pic.meters.map((meter, i) => span(under(meter.name, meter.value, WIDTHS[i] ?? 12), meter.tone, meter.look)).join(" ");
   const rows = pic.rows.map((line) => line.map((cell) => (cell.look === "win" ? `<span class="hit">${esc(cell.text)}</span>` : span(cell.text, cell.tone, cell.look))).join("  ")).join("\n");
   const label = pic.spin.trim();
   const spin = label ? `<span class="banner ${pic.bar}">${esc(center(label, BOARD))}</span>` : "";
