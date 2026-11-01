@@ -406,6 +406,8 @@ function box(label) {
 }
 var BOARD = 53;
 var WIDTHS = [13, 12, 13, 12];
+var REEL_PACE = 36;
+var ORB_PACE = 64;
 function under(label, value, width) {
   const name = center(label, width);
   const mid = Math.max(0, name.indexOf(label)) + (label.length - 1) / 2;
@@ -547,8 +549,8 @@ function reelSpin(before, after) {
 }
 function whirl(before, after, tick) {
   if (before.phase.kind === "arm" || before.phase.kind === "hold")
-    return cover(after, openings(before, after), tick, 36);
-  return rolling(after, tick, [1e9, 1e9, 1e9, 1e9, 1e9], 36);
+    return cover(after, openings(before, after), tick, ORB_PACE);
+  return rolling(after, tick, [1e9, 1e9, 1e9, 1e9, 1e9], REEL_PACE);
 }
 function coast(before, after, from) {
   if (!reelSpin(before, after))
@@ -575,7 +577,7 @@ function land(before, after) {
     return [end];
   const miss = after.rows.every((line, r) => line.every((label, c) => label === before.rows[r]?.[c]));
   const ticks = miss ? [0, 1, 2] : [0, 1, 2, 3, 4];
-  return [...ticks.map((tick) => cover(after, spots, tick, 40 + tick * 28)), end];
+  return [...ticks.map((tick) => cover(after, spots, tick, ORB_PACE + tick * 36)), end];
 }
 function cover(play, open, tick, wait) {
   const pic = picture(play);

@@ -75,6 +75,10 @@ function box(label: string): string {
 const BOARD = 53;
 const WIDTHS = [13, 12, 13, 12];
 
+/** How long one spinning frame stays up. Orb faces turn a little slower than the reels. */
+export const REEL_PACE = 36;
+export const ORB_PACE = 64;
+
 /** Four jackpot columns, the same width as the five reels. */
 function spread(parts: string[]): string {
   return parts.map((part, i) => center(part, WIDTHS[i] ?? 12)).join(" ");
@@ -234,8 +238,8 @@ function reelSpin(before: Play, after: Play): boolean {
 
 /** One fast frame while the player is still holding the button. */
 export function whirl(before: Play, after: Play, tick: number): Picture {
-  if (before.phase.kind === "arm" || before.phase.kind === "hold") return cover(after, openings(before, after), tick, 36);
-  return rolling(after, tick, [1e9, 1e9, 1e9, 1e9, 1e9], 36);
+  if (before.phase.kind === "arm" || before.phase.kind === "hold") return cover(after, openings(before, after), tick, ORB_PACE);
+  return rolling(after, tick, [1e9, 1e9, 1e9, 1e9, 1e9], REEL_PACE);
 }
 
 /** The slowdown that starts when the player lets go. The result is already in `after`. */
@@ -268,7 +272,7 @@ function land(before: Play, after: Play): Picture[] {
   if (spots.length === 0) return [end];
   const miss = after.rows.every((line, r) => line.every((label, c) => label === before.rows[r]?.[c]));
   const ticks = miss ? [0, 1, 2] : [0, 1, 2, 3, 4];
-  return [...ticks.map((tick) => cover(after, spots, tick, 40 + tick * 28)), end];
+  return [...ticks.map((tick) => cover(after, spots, tick, ORB_PACE + tick * 36)), end];
 }
 
 function cover(play: Play, open: [number, number][], tick: number, wait: number): Picture {
