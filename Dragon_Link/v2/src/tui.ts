@@ -1,4 +1,4 @@
-import { act, live, newPlay, type Play } from "./game";
+import { act, live, newPlay, stage, type Play } from "./game";
 import { ansi, coast, picture } from "./text";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -15,7 +15,7 @@ if (import.meta.main) {
   const stdin = process.stdin;
   stdin.setRawMode(true);
   stdin.resume();
-  let play: Play = newPlay();
+  let play: Play = stage(process.argv[2] ?? "") ?? newPlay();
   let coasting = false;
   let ready = true;
   let lastSpin = 0;

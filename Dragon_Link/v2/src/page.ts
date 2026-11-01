@@ -1,4 +1,4 @@
-import { act, live, newPlay, rulesHtml, type Play } from "./game";
+import { act, live, newPlay, rulesHtml, stage, type Play } from "./game";
 import { coast, markup, picture, type Picture } from "./text";
 
 function need(id: string): HTMLElement {
@@ -11,11 +11,16 @@ const board = need("#screen");
 const bar = need("#status");
 const copy = need("#rules");
 
-let play: Play = newPlay();
+let play: Play = opened();
 let busy = false;
 let down = false;
 let shownCoin = -1;
 const chance = live(seeded(1));
+
+function opened(): Play {
+  const name = new URLSearchParams(location.search).get("state");
+  return (name && stage(name)) || newPlay();
+}
 
 function draw(pic: Picture, coin: number) {
   board.innerHTML = markup(pic);
@@ -73,3 +78,11 @@ document.addEventListener("keyup", (event) => {
 window.addEventListener("blur", () => {
   down = false;
 });
+
+(window as unknown as { autumnState: (name: string) => void }).autumnState = (name) => {
+  if (down || busy) return;
+  const next = stage(name);
+  if (!next) return;
+  play = next;
+  draw(picture(play), play.coin);
+};

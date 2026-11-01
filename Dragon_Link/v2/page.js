@@ -93,6 +93,34 @@ function live(rng = Math.random) {
     locks: (open) => Array.from({ length: open }, () => rng() < 0.22)
   };
 }
+function scripted(input) {
+  const windows = [...input.windows ?? []];
+  const doors = [...input.doors ?? []];
+  const faces = [...input.faces ?? []];
+  const locks = [...input.locks ?? []];
+  const take = (queue, name) => {
+    const next = queue.shift();
+    if (next === undefined)
+      throw new Error(`script ran out of ${name}`);
+    return next;
+  };
+  return {
+    window: () => take(windows, "windows"),
+    door: () => take(doors, "doors"),
+    face: (allowMajor) => {
+      const face = take(faces, "faces");
+      if (!allowMajor && face.label === "MAJOR")
+        throw new Error("second MAJOR");
+      return face;
+    },
+    locks: (open) => {
+      const hit = take(locks, "locks");
+      if (hit.length !== open)
+        throw new Error(`expected ${open} locks`);
+      return hit;
+    }
+  };
+}
 function newPlay() {
   return show({
     credits: 50000,
@@ -391,6 +419,41 @@ ${pays}
   </tbody>
 </table>`;
 }
+var cells = (text) => {
+  const part = text.split(" ");
+  const row = (start) => [part[start], part[start + 1], part[start + 2], part[start + 3], part[start + 4]];
+  return [row(0), row(5), row(10)];
+};
+function stage(name) {
+  const face = (label, pay) => ({ label, pay });
+  const koi = cells("KOI KOI KOI Q LOTUS KOI KOI KOI K DRGN KOI KOI KOI FAN 9");
+  const moons = cells("MOON MOON MOON MOON MOON 9 10 J Q K 9 10 J Q K");
+  const trigger = cells("MOON MOON MOON 9 10 9 10 J Q K 9 10 J Q K");
+  const doors = cells("DOOR KOI DOOR J Q FAN DOOR 10 DOOR K 9 LOTUS DOOR FAN DOOR");
+  const six = cells("ORB ORB ORB ORB ORB ORB 9 10 J Q K 9 10 J Q");
+  const faces = [1, 2, 1, 5, 1, 1].map((times) => face(String(times * 50), times * 50));
+  if (name === "win")
+    return act(newPlay(), "spin", scripted({ windows: [koi] }));
+  if (name === "free")
+    return act(newPlay(), "spin", scripted({ windows: [moons] }));
+  if (name === "doors") {
+    const chance = scripted({ windows: [trigger, doors], doors: ["ORB"] });
+    return act(act(newPlay(), "spin", chance), "spin", chance);
+  }
+  if (name === "arm")
+    return act(newPlay(), "spin", scripted({ windows: [six], faces }));
+  if (name === "hold") {
+    const chance = scripted({ windows: [six], faces });
+    return act(act(newPlay(), "spin", chance), "spin", chance);
+  }
+  if (name === "grand") {
+    const full = cells(Array(15).fill("ORB").join(" "));
+    const many = Array.from({ length: 15 }, () => face("50", 50));
+    const chance = scripted({ windows: [full], faces: many });
+    return act(act(newPlay(), "spin", chance), "spin", chance);
+  }
+  return null;
+}
 
 // src/text.ts
 function commas(n) {
@@ -619,11 +682,15 @@ function need(id) {
 var board = need("#screen");
 var bar = need("#status");
 var copy = need("#rules");
-var play = newPlay();
+var play = opened();
 var busy = false;
 var down = false;
 var shownCoin = -1;
 var chance = live(seeded(1));
+function opened() {
+  const name = new URLSearchParams(location.search).get("state");
+  return name && stage(name) || newPlay();
+}
 function draw(pic, coin) {
   board.innerHTML = markup(pic);
   bar.textContent = pic.status;
@@ -677,3 +744,12 @@ document.addEventListener("keyup", (event) => {
 window.addEventListener("blur", () => {
   down = false;
 });
+window.autumnState = (name) => {
+  if (down || busy)
+    return;
+  const next = stage(name);
+  if (!next)
+    return;
+  play = next;
+  draw(picture(play), play.coin);
+};

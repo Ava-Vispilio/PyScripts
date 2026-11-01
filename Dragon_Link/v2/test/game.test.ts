@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { act, hotCells, live, newPlay, rulesHtml, scripted, type Face, type Row, type Rows } from "../src/game";
+import { act, hotCells, live, newPlay, rulesHtml, scripted, stage, type Face, type Row, type Rows } from "../src/game";
 import { frames, markup, picture, plain } from "../src/text";
 
 const row = (a: string, b: string, c: string, d: string, e: string): Row => [a, b, c, d, e];
@@ -136,4 +136,14 @@ test("the same seed plays the same game", () => {
   const right = act(newPlay(), "spin", live(rng(7)));
   expect(left.rows).toEqual(right.rows);
   expect(left.credits).toBe(right.credits);
+});
+
+test("a named state is a finished play", () => {
+  expect(stage("win")?.win).toBeGreaterThan(0);
+  expect(stage("free")?.phase).toEqual({ kind: "free", left: 6 });
+  expect(stage("doors")?.phase.kind).toBe("doors");
+  expect(stage("arm")?.phase.kind).toBe("arm");
+  expect(stage("hold")?.phase.kind).toBe("hold");
+  expect(stage("grand")?.status.startsWith("GRAND ")).toBe(true);
+  expect(stage("nope")).toBeNull();
 });

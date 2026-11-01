@@ -468,3 +468,38 @@ ${pays}
   </tbody>
 </table>`;
 }
+
+const cells = (text: string): Rows => {
+  const part = text.split(" ");
+  const row = (start: number): Row => [part[start]!, part[start + 1]!, part[start + 2]!, part[start + 3]!, part[start + 4]!];
+  return [row(0), row(5), row(10)];
+};
+
+/** A finished play for a named situation. Used by the page query `state` and the tests. */
+export function stage(name: string): Play | null {
+  const face = (label: string, pay: number): Face => ({ label, pay });
+  const koi = cells("KOI KOI KOI Q LOTUS KOI KOI KOI K DRGN KOI KOI KOI FAN 9");
+  const moons = cells("MOON MOON MOON MOON MOON 9 10 J Q K 9 10 J Q K");
+  const trigger = cells("MOON MOON MOON 9 10 9 10 J Q K 9 10 J Q K");
+  const doors = cells("DOOR KOI DOOR J Q FAN DOOR 10 DOOR K 9 LOTUS DOOR FAN DOOR");
+  const six = cells("ORB ORB ORB ORB ORB ORB 9 10 J Q K 9 10 J Q");
+  const faces = [1, 2, 1, 5, 1, 1].map((times) => face(String(times * 50), times * 50));
+  if (name === "win") return act(newPlay(), "spin", scripted({ windows: [koi] }));
+  if (name === "free") return act(newPlay(), "spin", scripted({ windows: [moons] }));
+  if (name === "doors") {
+    const chance = scripted({ windows: [trigger, doors], doors: ["ORB"] });
+    return act(act(newPlay(), "spin", chance), "spin", chance);
+  }
+  if (name === "arm") return act(newPlay(), "spin", scripted({ windows: [six], faces }));
+  if (name === "hold") {
+    const chance = scripted({ windows: [six], faces });
+    return act(act(newPlay(), "spin", chance), "spin", chance);
+  }
+  if (name === "grand") {
+    const full = cells(Array(15).fill("ORB").join(" "));
+    const many = Array.from({ length: 15 }, () => face("50", 50));
+    const chance = scripted({ windows: [full], faces: many });
+    return act(act(newPlay(), "spin", chance), "spin", chance);
+  }
+  return null;
+}
