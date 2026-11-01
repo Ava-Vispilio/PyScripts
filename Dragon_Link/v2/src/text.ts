@@ -56,7 +56,7 @@ const SGR: Record<Tone, string> = {
   gold: "33;1",
 };
 
-const LOOK: Record<Look, string> = { still: "", spin: ";2", win: ";7", lock: ";1" };
+const LOOK: Record<Look, string> = { still: "", spin: ";2", win: "", lock: ";1" };
 
 function commas(n: number): string {
   return Math.floor(n).toLocaleString("en-US");
@@ -169,7 +169,7 @@ export function picture(play: Play): Picture {
       ["MAJOR", meter(play.major), "major"],
       ["GRAND", meter(play.grand), "grand"],
     ] as const
-  ).map(([name, value, tone]) => ({ name, value, tone, look: prize === name ? "win" : "still" }) as const);
+  ).map(([name, value, tone]) => ({ name, value, tone, look: prize === name ? "lock" : "still" }) as const);
   const rows = play.rows.map((line, r) =>
     line.map((label, c) => {
       const locked = lockedAt(play, r, c);
@@ -273,7 +273,7 @@ function paint(codes: string, text: string): string {
 
 const BAR: Record<Bar, string> = {
   play: "42;97",
-  win: "43;30",
+  win: "42;97",
   free: "44;97",
   door: "104;97",
   hold: "48;5;208;97",
@@ -289,9 +289,9 @@ export function ansi(pic: Picture): string {
   const col = (text: string, tone: Tone, look: Look, i: number) => paint(SGR[tone] + LOOK[look], center(text, width[i] ?? 12));
   const meters = pic.meters.map((meter, i) => col(meter.name, meter.tone, "still", i)).join(" ");
   const values = pic.meters.map((meter, i) => col(meter.value, meter.tone, meter.look, i)).join(" ");
-  const rows = pic.rows.map((line) => line.map((cell) => paint(SGR[cell.tone] + LOOK[cell.look], cell.text)).join("  ")).join("\n");
-  const aboveCode = pic.bar === "spin" ? BAR.spin : SGR[pic.bannerTone] + ";1";
-  const above = pic.spin ? paint(aboveCode, center(pic.spin.trim(), BOARD)) : "";
+  const ink = (cell: Cell) => (cell.look === "win" ? "30;106" : SGR[cell.tone] + LOOK[cell.look]);
+  const rows = pic.rows.map((line) => line.map((cell) => paint(ink(cell), cell.text)).join("  ")).join("\n");
+  const above = pic.spin ? paint(BAR[pic.bar], center(pic.spin.trim(), BOARD)) : "";
   const lines = [paint(SGR.gold, "AUTUMN MOON"), "", meters, values, above, rows, "", paint("37", pic.credits), paint("33", pic.feature)];
   return `\x1b[H\x1b[J${lines.join("\n")}\n${paint(BAR[pic.bar], center(pic.status, BOARD))}\n`;
 }
@@ -310,9 +310,8 @@ export function markup(pic: Picture): string {
   const col = (text: string, tone: Tone, look: Look, i: number) => span(center(text, width[i] ?? 12), tone, look);
   const meters = pic.meters.map((meter, i) => col(meter.name, meter.tone, "still", i)).join(" ");
   const values = pic.meters.map((meter, i) => col(meter.value, meter.tone, meter.look, i)).join(" ");
-  const rows = pic.rows.map((line) => line.map((cell) => span(cell.text, cell.tone, cell.look)).join("  ")).join("\n");
+  const rows = pic.rows.map((line) => line.map((cell) => (cell.look === "win" ? `<span class="hit">${esc(cell.text)}</span>` : span(cell.text, cell.tone, cell.look))).join("  ")).join("\n");
   const label = pic.spin.trim();
-  const spinClass = pic.bar === "spin" ? "spinbar" : pic.bannerTone;
-  const spin = label ? `<span class="${spinClass}">${esc(center(label, BOARD))}</span>` : "";
+  const spin = label ? `<span class="banner ${pic.bar}">${esc(center(label, BOARD))}</span>` : "";
   return `${span("AUTUMN MOON", "gold", "still")}\n\n${meters}\n${values}\n${spin}\n${rows}\n\n${span(pic.credits, "card", "still")}\n${span(pic.feature, "gold", "still")}`;
 }

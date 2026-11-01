@@ -43,6 +43,7 @@ test("five moons pay 250 times the bet and start six free games", () => {
   expect(play.credits).toBe(50_000 - 50 + 250 * 50);
   expect(play.phase).toEqual({ kind: "free", left: 6 });
   expect(plain(play)).toContain("6 free games left");
+  expect(markup(picture(play))).toContain('class="banner free"');
 });
 
 test("doors on one free spin open onto one symbol", () => {
@@ -52,6 +53,7 @@ test("doors on one free spin open onto one symbol", () => {
   play = act(play, "spin", scripted({ windows: [doors], doors: ["ORB"] }));
   expect(plain(play)).toContain("[ DOOR  ]");
   expect(play.status).toBe("Press Enter to open the doors");
+  expect(markup(picture(play))).toContain('class="banner door"');
   play = act(play, "spin", scripted({}));
   expect(plain(play)).not.toContain("DOOR");
   expect(play.rows.flat().filter((symbol) => symbol === "ORB")).toHaveLength(6);
@@ -65,6 +67,7 @@ test("a new orb resets the respin count and fifteen orbs pay Grand", () => {
   play = act(play, "spin", scripted({ faces }));
   expect(play.phase).toMatchObject({ kind: "hold", respins: 3 });
   expect(play.status).toBe("Press Enter for hold-and-spin respin 3");
+  expect(markup(picture(play))).toContain('class="banner hold"');
   play = act(play, "spin", scripted({ locks: [[true, false, false, false, false, false, false, false, false]], faces: [face("100", 100)] }));
   expect(play.phase).toMatchObject({ kind: "hold", respins: 3 });
   const full = grid(Array(15).fill("ORB"));
@@ -73,6 +76,7 @@ test("a new orb resets the respin count and fifteen orbs pay Grand", () => {
   grand = act(grand, "spin", scripted({ faces: many }));
   expect(grand.status.startsWith("GRAND ")).toBe(true);
   expect(grand.status.endsWith("press Enter to collect")).toBe(true);
+  expect(markup(picture(grand))).toContain('class="banner grand"');
 });
 
 test("winning cells light up and the reels stop one at a time", () => {
@@ -94,6 +98,7 @@ test("winning cells light up and the reels stop one at a time", () => {
   expect(pics.at(-1)!.rows[0]![0]!.look).toBe("win");
   expect(pics.at(-1)!.spin.trim()).toBe("WINNER");
   expect(pics.at(-1)!.bar).toBe("win");
+  expect(markup(pics.at(-1)!)).toContain('class="banner win"');
   expect(markup(picture(start)).split("\n").length).toBe(markup(pics.at(-1)!).split("\n").length);
   expect(picture(start).rows[0]![0]!.tone).toBe("dragon");
   expect(picture(start).rows[0]![2]!.tone).toBe("orb");

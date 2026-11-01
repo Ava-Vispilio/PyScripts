@@ -488,7 +488,7 @@ function picture(play) {
     ["MINOR", meter(5000), "minor"],
     ["MAJOR", meter(play.major), "major"],
     ["GRAND", meter(play.grand), "grand"]
-  ].map(([name, value, tone]) => ({ name, value, tone, look: prize === name ? "win" : "still" }));
+  ].map(([name, value, tone]) => ({ name, value, tone, look: prize === name ? "lock" : "still" }));
   const rows = play.rows.map((line, r) => line.map((label, c) => {
     const locked = lockedAt(play, r, c);
     const dim = holding && !locked;
@@ -585,11 +585,10 @@ function markup(pic) {
   const col = (text, tone, look, i) => span(center(text, width[i] ?? 12), tone, look);
   const meters = pic.meters.map((meter, i) => col(meter.name, meter.tone, "still", i)).join(" ");
   const values = pic.meters.map((meter, i) => col(meter.value, meter.tone, meter.look, i)).join(" ");
-  const rows = pic.rows.map((line) => line.map((cell) => span(cell.text, cell.tone, cell.look)).join("  ")).join(`
+  const rows = pic.rows.map((line) => line.map((cell) => cell.look === "win" ? `<span class="hit">${esc(cell.text)}</span>` : span(cell.text, cell.tone, cell.look)).join("  ")).join(`
 `);
   const label = pic.spin.trim();
-  const spinClass = pic.bar === "spin" ? "spinbar" : pic.bannerTone;
-  const spin = label ? `<span class="${spinClass}">${esc(center(label, BOARD))}</span>` : "";
+  const spin = label ? `<span class="banner ${pic.bar}">${esc(center(label, BOARD))}</span>` : "";
   return `${span("AUTUMN MOON", "gold", "still")}
 
 ${meters}
