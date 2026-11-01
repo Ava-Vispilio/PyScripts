@@ -49,8 +49,8 @@ const LINE: Record<Paying, Record<3 | 4 | 5, number>> = {
 };
 
 const COINS = [1, 2, 5, 10];
-const BASE_HOLD = "FEATURE: Collect 6 or more ORB symbols for HOLD & SPIN.";
-const HOLD_RULE = "FEATURE: Reset to 3 respins whenever a new ORB lands.";
+const BASE_HOLD = "FEATURE: Collect 6 or more ORB symbols for HOLD & SPIN";
+const HOLD_RULE = "FEATURE: Reset to 3 respins whenever a new ORB lands";
 
 const REEL0 = ["9", "10", "J", "Q", "K", "9", "10", "FAN", "KOI", "LOTUS", "DRGN", "MOON", "ORB", "Q", "K", "9"];
 const REEL = ["9", "10", "J", "Q", "K", "WILD", "FAN", "KOI", "LOTUS", "DRGN", "MOON", "ORB", "9", "10", "J", "Q"];
@@ -181,13 +181,13 @@ export function newPlay(): Play {
 
 function show(play: Omit<Play, "feature" | "status"> & { feature?: string; status?: string }): Play {
   const feature = play.feature ?? featureOf(play.phase);
-  const status = play.status ?? "Press Enter to spin.";
+  const status = play.status ?? "Press Enter to spin";
   return { ...play, feature, status };
 }
 
 function featureOf(phase: Phase): string {
   if (phase.kind === "free" || phase.kind === "doors") {
-    return `FEATURE: Every door opens onto the same symbol. ${phase.left} free games left.`;
+    return `FEATURE: Every door opens onto the same symbol, ${phase.left} free games left`;
   }
   if (phase.kind === "hold" || phase.kind === "arm" || phase.kind === "jackpot") return HOLD_RULE;
   return BASE_HOLD;
@@ -224,7 +224,7 @@ function changeCoin(play: Play, key: "coinUp" | "coinDown"): Play {
 
 function spinBase(play: Play, chance: Chance): Play {
   const bet = betOf(play);
-  if (play.credits < bet) return show({ ...play, status: "Not enough credits for this bet." });
+  if (play.credits < bet) return show({ ...play, status: "Not enough credits for this bet" });
   const grid = chance.window(false);
   const paid = { ...play, credits: play.credits - bet, major: play.major + 50 * 0.01, grand: play.grand + 50 * 0.004 };
   return settle(paid, grid, { kind: "base" });
@@ -239,7 +239,7 @@ function spinFree(play: Play, phase: Extract<Phase, { kind: "free" }>, chance: C
       rows: grid,
       win: 0,
       phase: { kind: "doors", left, face: chance.door(), under: grid },
-      status: "Press Enter to open the doors.",
+      status: "Press Enter to open the doors",
     });
   }
   return settle(play, grid, { kind: "free", left });
@@ -262,14 +262,14 @@ function settle(play: Play, grid: Rows, resume: Resume): Play {
     win: score.pay,
     phase: next.kind === "free" ? { kind: "free", left: next.left } : { kind: "base" },
     feature: next.kind === "free" ? featureOf({ kind: "free", left: next.left }) : BASE_HOLD,
-    status: "Press Enter to spin.",
+    status: "Press Enter to spin",
   });
   if (score.orbs < 6) return shown;
   return show({
     ...shown,
     phase: { kind: "arm", under: grid, resume: next },
     feature: HOLD_RULE,
-    status: "Six orbs landed. Press Enter to start Hold & Spin.",
+    status: "Six orbs landed, press Enter to start Hold & Spin",
   });
 }
 
@@ -354,7 +354,7 @@ function landHold(play: Play, locked: Locked, under: Rows, respins: number, resu
       win,
       phase: { kind: "hold", respins, locked, under, resume },
       feature: HOLD_RULE,
-      status: `Press Enter for hold-and-spin respin ${respins}.`,
+      status: `Press Enter for hold-and-spin respin ${respins}`,
     });
   }
   return finish(play, locked, under, rows, win, resume, full);
@@ -393,7 +393,7 @@ function finish(play: Play, locked: Locked, under: Rows, rows: Rows, win: number
     win,
     phase: { kind: "jackpot", pending, locked, under, resume },
     feature: HOLD_RULE,
-    status: `${first.name} ${first.amount.toLocaleString("en-US")}. Press Enter to collect.`,
+    status: `${first.name} ${first.amount.toLocaleString("en-US")}, press Enter to collect`,
   });
 }
 
@@ -406,7 +406,7 @@ function collect(play: Play, phase: Extract<Phase, { kind: "jackpot" }>): Play {
       ...play,
       credits,
       phase: { ...phase, pending: rest },
-      status: `${next.name} ${next.amount.toLocaleString("en-US")}. Press Enter to collect.`,
+      status: `${next.name} ${next.amount.toLocaleString("en-US")}, press Enter to collect`,
     });
   }
   return returned({ ...play, credits, win: 0 }, phase.resume);
@@ -418,10 +418,10 @@ function returned(play: Omit<Play, "feature" | "status" | "phase">, resume: Resu
       ...play,
       phase: { kind: "free", left: resume.left },
       feature: featureOf({ kind: "free", left: resume.left }),
-      status: "Press Enter to spin.",
+      status: "Press Enter to spin",
     });
   }
-  return show({ ...play, phase: { kind: "base" }, feature: BASE_HOLD, status: "Press Enter to spin." });
+  return show({ ...play, phase: { kind: "base" }, feature: BASE_HOLD, status: "Press Enter to spin" });
 }
 
 const PARODY = [

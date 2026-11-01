@@ -18,7 +18,7 @@ test("the screen is the terminal text", () => {
   expect(lines[5]).toHaveLength(53);
   expect(text).toContain("[ DRGN  ]  [ MOON  ]  [  ORB  ]  [ LOTUS ]  [  FAN  ]");
   expect(text).toContain("credits: 50,000     bet: 50     win: 0");
-  expect(text.endsWith("Press Enter to spin.")).toBe(true);
+  expect(text.endsWith("Press Enter to spin")).toBe(true);
 });
 
 test("three KOI pay on every line and an orb does not", () => {
@@ -42,7 +42,7 @@ test("five moons pay 250 times the bet and start six free games", () => {
   const play = act(newPlay(), "spin", scripted({ windows: [moons] }));
   expect(play.credits).toBe(50_000 - 50 + 250 * 50);
   expect(play.phase).toEqual({ kind: "free", left: 6 });
-  expect(plain(play)).toContain("6 free games left.");
+  expect(plain(play)).toContain("6 free games left");
 });
 
 test("doors on one free spin open onto one symbol", () => {
@@ -51,11 +51,11 @@ test("doors on one free spin open onto one symbol", () => {
   let play = act(newPlay(), "spin", scripted({ windows: [trigger, doors], doors: ["ORB"] }));
   play = act(play, "spin", scripted({ windows: [doors], doors: ["ORB"] }));
   expect(plain(play)).toContain("[ DOOR  ]");
-  expect(play.status).toBe("Press Enter to open the doors.");
+  expect(play.status).toBe("Press Enter to open the doors");
   play = act(play, "spin", scripted({}));
   expect(plain(play)).not.toContain("DOOR");
   expect(play.rows.flat().filter((symbol) => symbol === "ORB")).toHaveLength(6);
-  expect(play.status).toBe("Six orbs landed. Press Enter to start Hold & Spin.");
+  expect(play.status).toBe("Six orbs landed, press Enter to start Hold & Spin");
 });
 
 test("a new orb resets the respin count and fifteen orbs pay Grand", () => {
@@ -64,7 +64,7 @@ test("a new orb resets the respin count and fifteen orbs pay Grand", () => {
   let play = act(newPlay(), "spin", scripted({ windows: [six], faces }));
   play = act(play, "spin", scripted({ faces }));
   expect(play.phase).toMatchObject({ kind: "hold", respins: 3 });
-  expect(play.status).toBe("Press Enter for hold-and-spin respin 3.");
+  expect(play.status).toBe("Press Enter for hold-and-spin respin 3");
   play = act(play, "spin", scripted({ locks: [[true, false, false, false, false, false, false, false, false]], faces: [face("100", 100)] }));
   expect(play.phase).toMatchObject({ kind: "hold", respins: 3 });
   const full = grid(Array(15).fill("ORB"));
@@ -72,7 +72,7 @@ test("a new orb resets the respin count and fifteen orbs pay Grand", () => {
   let grand = act(newPlay(), "spin", scripted({ windows: [full], faces: many }));
   grand = act(grand, "spin", scripted({ faces: many }));
   expect(grand.status.startsWith("GRAND ")).toBe(true);
-  expect(grand.status.endsWith("Press Enter to collect.")).toBe(true);
+  expect(grand.status.endsWith("press Enter to collect")).toBe(true);
 });
 
 test("winning cells light up and the reels stop one at a time", () => {
