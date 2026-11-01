@@ -23,7 +23,7 @@ test("the screen is the terminal text", () => {
   expect(lines.at(-2)!.startsWith("TIP:")).toBe(true);
   expect(lines.at(-2)!.length).toBeLessThanOrEqual(53);
   expect(text).toContain("[ DRGN  ]  [ MOON  ]  [  ORB  ]  [ LOTUS ]  [  FAN  ]");
-  expect(text).toContain("credits: 50,000     bet: 50     win: 0");
+  expect(text).toContain("Credits: 50,000     Bet: 50     Win: 0");
   expect(text.endsWith("Press Enter to spin")).toBe(true);
 });
 

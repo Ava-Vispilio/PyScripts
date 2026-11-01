@@ -418,6 +418,10 @@ function under(label, value, width) {
 var REEL02 = ["9", "10", "J", "Q", "K", "FAN", "KOI", "LOTUS", "DRGN", "MOON", "ORB"];
 var REEL2 = ["9", "10", "J", "Q", "K", "WILD", "FAN", "KOI", "LOTUS", "DRGN", "MOON", "ORB"];
 var FACES2 = ["50", "100", "150", "250", "400", "750", "MINI", "MINOR", "MAJOR"];
+function creditLine(play) {
+  const bet = 50 * play.coin;
+  return `Credits: ${commas(play.credits)}     Bet: ${commas(bet)}     Win: ${commas(play.win)}`;
+}
 function toneOf(label) {
   switch (label) {
     case "FAN":
@@ -488,7 +492,6 @@ function barOf(play) {
   return "play";
 }
 function picture(play) {
-  const bet = 50 * play.coin;
   const meter = (coins) => commas(coins * play.coin);
   const holding = play.phase.kind === "hold" || play.phase.kind === "jackpot";
   const hot = holding ? [] : hotCells(play.rows);
@@ -509,7 +512,7 @@ function picture(play) {
   return {
     meters: [...meters],
     rows,
-    credits: `credits: ${commas(play.credits)}     bet: ${commas(bet)}     win: ${commas(play.win)}`,
+    credits: creditLine(play),
     feature: play.feature,
     status: play.status,
     spin: note.banner ? center(note.banner, BOARD) : "",

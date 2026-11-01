@@ -94,6 +94,11 @@ const REEL0 = ["9", "10", "J", "Q", "K", "FAN", "KOI", "LOTUS", "DRGN", "MOON", 
 const REEL = ["9", "10", "J", "Q", "K", "WILD", "FAN", "KOI", "LOTUS", "DRGN", "MOON", "ORB"];
 const FACES = ["50", "100", "150", "250", "400", "750", "MINI", "MINOR", "MAJOR"];
 
+function creditLine(play: Play): string {
+  const bet = 50 * play.coin;
+  return `Credits: ${commas(play.credits)}     Bet: ${commas(bet)}     Win: ${commas(play.win)}`;
+}
+
 function toneOf(label: string): Tone {
   switch (label) {
     case "FAN":
@@ -133,13 +138,12 @@ function lockedAt(play: Play, r: number, c: number): boolean {
 
 /** The screen from the video, as plain text. The last line is the status bar. */
 export function plain(play: Play): string {
-  const bet = 50 * play.coin;
   const names = ["MINI", "MINOR", "MAJOR", "GRAND"];
   const meter = (coins: number) => commas(coins * play.coin);
   const head = spread(names);
   const values = [meter(1000), meter(5000), meter(play.major), meter(play.grand)].map((amount, i) => under(names[i] ?? "", amount, WIDTHS[i] ?? 12)).join(" ");
   const rows = play.rows.map((row) => row.map(box).join("  ")).join("\n");
-  return ["AUTUMN MOON", "", head, values, "", rows, "", `credits: ${commas(play.credits)}     bet: ${commas(bet)}     win: ${commas(play.win)}`, play.feature, play.status].join("\n");
+  return ["AUTUMN MOON", "", head, values, "", rows, "", creditLine(play), play.feature, play.status].join("\n");
 }
 
 function callout(play: Play): { banner: string; bannerTone: Tone } {
@@ -168,7 +172,6 @@ function barOf(play: Play): Bar {
 
 /** One settled screen, with a color and a highlight on every cell. */
 export function picture(play: Play): Picture {
-  const bet = 50 * play.coin;
   const meter = (coins: number) => commas(coins * play.coin);
   const holding = play.phase.kind === "hold" || play.phase.kind === "jackpot";
   const hot = holding ? [] : hotCells(play.rows);
@@ -193,7 +196,7 @@ export function picture(play: Play): Picture {
   return {
     meters: [...meters],
     rows,
-    credits: `credits: ${commas(play.credits)}     bet: ${commas(bet)}     win: ${commas(play.win)}`,
+    credits: creditLine(play),
     feature: play.feature,
     status: play.status,
     spin: note.banner ? center(note.banner, BOARD) : "",
