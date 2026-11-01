@@ -511,7 +511,7 @@ function stopsFor(rows) {
   const base = [6, 9, 12, 16, 20];
   return base.map((ticks, reel) => ticks + (rows[0]?.[reel] ?? "A").charCodeAt(0) % 3);
 }
-function rolling(after, tick, stops) {
+function rolling(after, tick, stops, wait) {
   const pic = picture(after);
   const moving = stops.map((stop) => tick < stop);
   pic.rows = pic.rows.map((line, r) => line.map((cell, reel) => {
@@ -521,44 +521,49 @@ function rolling(after, tick, stops) {
     const label = strip[(tick + r * 3 + reel * 2) % strip.length];
     return { text: box(label), tone: toneOf(label), look: "spin" };
   }));
-  return {
-    ...pic,
-    spin: center("SPINNING", BOARD),
-    banner: "",
-    bar: "spin",
-    status: "Reels stopping.",
-    wait: 32 + tick * 14
-  };
+  return { ...pic, spin: center("SPINNING", BOARD), banner: "", bar: "spin", wait };
 }
-function frames(before, after) {
-  if (before.rows === after.rows && before.phase.kind === after.phase.kind)
+function reelSpin(before, after) {
+  const kind = before.phase.kind;
+  if (kind === "arm" || kind === "hold")
+    return true;
+  if (kind === "base" || kind === "free")
+    return after.rows !== before.rows;
+  return false;
+}
+function whirl(before, after, tick) {
+  if (before.phase.kind === "arm" || before.phase.kind === "hold")
+    return cover(after, openings(before, after), tick, 36);
+  return rolling(after, tick, [1e9, 1e9, 1e9, 1e9, 1e9], 36);
+}
+function coast(before, after, from) {
+  if (!reelSpin(before, after))
     return [picture(after)];
-  if (before.phase.kind === "base" || before.phase.kind === "free") {
-    const stops = stopsFor(after.rows);
-    const last = Math.max(...stops);
-    const rollingFrames = Array.from({ length: last }, (_, tick) => rolling(after, tick, stops));
-    return [...rollingFrames, picture(after)];
-  }
   if (before.phase.kind === "arm" || before.phase.kind === "hold")
     return land(before, after);
-  return [picture(after)];
+  const remain = stopsFor(after.rows);
+  const last = Math.max(...remain);
+  const slowing = Array.from({ length: last }, (_, step) => rolling(after, from + step, remain.map((n) => from + n), 32 + step * 14));
+  return [...slowing, picture(after)];
 }
-function land(before, after) {
-  const end = picture(after);
+function openings(before, after) {
   const spots = [];
   after.rows.forEach((line, r) => line.forEach((label, c) => label !== before.rows[r]?.[c] && spots.push([r, c])));
   if (spots.length === 0 && before.phase.kind === "hold") {
     before.phase.locked.forEach((line, r) => line.forEach((cell, c) => cell == null && spots.push([r, c])));
-    if (spots.length === 0)
-      return [end];
-    return [...[0, 1, 2].map((tick) => cover(after, spots, tick)), end];
   }
+  return spots;
+}
+function land(before, after) {
+  const end = picture(after);
+  const spots = openings(before, after);
   if (spots.length === 0)
     return [end];
-  const rollingFrames = [0, 1, 2, 3, 4].map((tick) => cover(after, spots, tick));
-  return [...rollingFrames, end];
+  const miss = after.rows.every((line, r) => line.every((label, c) => label === before.rows[r]?.[c]));
+  const ticks = miss ? [0, 1, 2] : [0, 1, 2, 3, 4];
+  return [...ticks.map((tick) => cover(after, spots, tick, 40 + tick * 28)), end];
 }
-function cover(play, open, tick) {
+function cover(play, open, tick, wait) {
   const pic = picture(play);
   for (const [r, c] of open) {
     const row = pic.rows[r];
@@ -566,7 +571,7 @@ function cover(play, open, tick) {
     if (row)
       row[c] = { text: box(label), tone: toneOf(label), look: "spin" };
   }
-  return { ...pic, spin: center("HOLD & SPIN", BOARD), banner: "", bar: "spin", status: "Orbs landing.", wait: 40 + tick * 28 };
+  return { ...pic, spin: center("HOLD & SPIN", BOARD), banner: "", bar: "spin", wait };
 }
 function esc(text) {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -606,6 +611,10 @@ var bar = need("#status");
 var copy = need("#rules");
 var play = newPlay();
 var busy = false;
+var down = false;
+var tick = 0;
+var pending = null;
+var pulse = 0;
 var shownCoin = -1;
 var chance = live(seeded(1));
 function draw(pic, coin) {
@@ -624,22 +633,70 @@ function seeded(seed) {
     return state / 2 ** 32;
   };
 }
-async function show2(next) {
-  const list = frames(play, next);
+function stopPulse() {
+  window.clearInterval(pulse);
+  pulse = 0;
+}
+async function land2() {
+  if (!pending)
+    return;
+  const before = play;
+  const landed = pending;
+  const from = tick;
+  pending = null;
+  down = false;
+  stopPulse();
   busy = true;
+  const list = coast(before, landed, from);
   for (let i = 0;i < list.length; i++) {
-    draw(list[i], next.coin);
+    draw(list[i], landed.coin);
     if (i < list.length - 1)
       await new Promise((resolve) => setTimeout(resolve, list[i].wait));
   }
-  play = next;
+  play = landed;
   busy = false;
+}
+function press(key) {
+  if (key !== "spin") {
+    if (down || busy)
+      return;
+    play = act(play, key, chance);
+    draw(picture(play), play.coin);
+    return;
+  }
+  if (down || busy)
+    return;
+  const after = act(play, "spin", chance);
+  const kind = play.phase.kind;
+  const rolls = kind === "arm" || kind === "hold" || (kind === "base" || kind === "free") && after.rows !== play.rows;
+  if (!rolls) {
+    play = after;
+    draw(picture(play), play.coin);
+    return;
+  }
+  down = true;
+  pending = after;
+  tick = 0;
+  draw(whirl(play, after, tick), after.coin);
+  pulse = window.setInterval(() => {
+    tick += 1;
+    if (pending)
+      draw(whirl(play, pending, tick), pending.coin);
+  }, 36);
 }
 draw(picture(play), play.coin);
 document.addEventListener("keydown", (event) => {
   const key = event.key === "Enter" || event.key === " " ? "spin" : event.key === "ArrowRight" ? "coinUp" : event.key === "ArrowLeft" ? "coinDown" : null;
-  if (!key || busy)
+  if (!key || event.repeat)
     return;
   event.preventDefault();
-  show2(act(play, key, chance));
+  press(key);
+});
+document.addEventListener("keyup", (event) => {
+  if ((event.key === "Enter" || event.key === " ") && down)
+    land2();
+});
+window.addEventListener("blur", () => {
+  if (down)
+    land2();
 });

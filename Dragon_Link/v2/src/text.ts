@@ -189,7 +189,7 @@ function stopsFor(rows: Play["rows"]): number[] {
   return base.map((ticks, reel) => ticks + ((rows[0]?.[reel] ?? "A").charCodeAt(0) % 3));
 }
 
-function rolling(after: Play, tick: number, stops: number[]): Picture {
+function rolling(after: Play, tick: number, stops: number[], wait: number): Picture {
   const pic = picture(after);
   const moving = stops.map((stop) => tick < stop);
   pic.rows = pic.rows.map((line, r) =>
@@ -200,51 +200,63 @@ function rolling(after: Play, tick: number, stops: number[]): Picture {
       return { text: box(label), tone: toneOf(label), look: "spin" };
     }),
   );
-  return {
-    ...pic,
-    spin: center("SPINNING", BOARD),
-    banner: "",
-    bar: "spin",
-    status: "Reels stopping.",
-    wait: 32 + tick * 14,
-  };
+  return { ...pic, spin: center("SPINNING", BOARD), banner: "", bar: "spin", wait };
 }
 
-/** Reel stops, door opens, and hold-and-spin landings between two plays. */
-export function frames(before: Play, after: Play): Picture[] {
-  if (before.rows === after.rows && before.phase.kind === after.phase.kind) return [picture(after)];
-  if (before.phase.kind === "base" || before.phase.kind === "free") {
-    const stops = stopsFor(after.rows);
-    const last = Math.max(...stops);
-    const rollingFrames = Array.from({ length: last }, (_, tick) => rolling(after, tick, stops));
-    return [...rollingFrames, picture(after)];
-  }
+function reelSpin(before: Play, after: Play): boolean {
+  const kind = before.phase.kind;
+  if (kind === "arm" || kind === "hold") return true;
+  if (kind === "base" || kind === "free") return after.rows !== before.rows;
+  return false;
+}
+
+/** One fast frame while the player is still holding the button. */
+export function whirl(before: Play, after: Play, tick: number): Picture {
+  if (before.phase.kind === "arm" || before.phase.kind === "hold") return cover(after, openings(before, after), tick, 36);
+  return rolling(after, tick, [1e9, 1e9, 1e9, 1e9, 1e9], 36);
+}
+
+/** The slowdown that starts when the player lets go. The result is already in `after`. */
+export function coast(before: Play, after: Play, from: number): Picture[] {
+  if (!reelSpin(before, after)) return [picture(after)];
   if (before.phase.kind === "arm" || before.phase.kind === "hold") return land(before, after);
-  return [picture(after)];
+  const remain = stopsFor(after.rows);
+  const last = Math.max(...remain);
+  const slowing = Array.from({ length: last }, (_, step) => rolling(after, from + step, remain.map((n) => from + n), 32 + step * 14));
+  return [...slowing, picture(after)];
 }
 
-function land(before: Play, after: Play): Picture[] {
-  const end = picture(after);
+/** Reel stops and hold-and-spin landings between two plays. */
+export function frames(before: Play, after: Play): Picture[] {
+  return coast(before, after, 0);
+}
+
+function openings(before: Play, after: Play): [number, number][] {
   const spots: [number, number][] = [];
   after.rows.forEach((line, r) => line.forEach((label, c) => label !== before.rows[r]?.[c] && spots.push([r, c])));
   if (spots.length === 0 && before.phase.kind === "hold") {
     before.phase.locked.forEach((line, r) => line.forEach((cell, c) => cell == null && spots.push([r, c])));
-    if (spots.length === 0) return [end];
-    return [...[0, 1, 2].map((tick) => cover(after, spots, tick)), end];
   }
-  if (spots.length === 0) return [end];
-  const rollingFrames = [0, 1, 2, 3, 4].map((tick) => cover(after, spots, tick));
-  return [...rollingFrames, end];
+  return spots;
 }
 
-function cover(play: Play, open: [number, number][], tick: number): Picture {
+function land(before: Play, after: Play): Picture[] {
+  const end = picture(after);
+  const spots = openings(before, after);
+  if (spots.length === 0) return [end];
+  const miss = after.rows.every((line, r) => line.every((label, c) => label === before.rows[r]?.[c]));
+  const ticks = miss ? [0, 1, 2] : [0, 1, 2, 3, 4];
+  return [...ticks.map((tick) => cover(after, spots, tick, 40 + tick * 28)), end];
+}
+
+function cover(play: Play, open: [number, number][], tick: number, wait: number): Picture {
   const pic = picture(play);
   for (const [r, c] of open) {
     const row = pic.rows[r];
     const label = FACES[(tick + r + c) % FACES.length]!;
     if (row) row[c] = { text: box(label), tone: toneOf(label), look: "spin" };
   }
-  return { ...pic, spin: center("HOLD & SPIN", BOARD), banner: "", bar: "spin", status: "Orbs landing.", wait: 40 + tick * 28 };
+  return { ...pic, spin: center("HOLD & SPIN", BOARD), banner: "", bar: "spin", wait };
 }
 
 function paint(codes: string, text: string): string {
