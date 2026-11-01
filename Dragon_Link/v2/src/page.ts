@@ -1,5 +1,5 @@
 import { act, live, newPlay, rulesHtml, type Play } from "./game";
-import { coast, markup, picture, whirl, type Picture } from "./text";
+import { coast, markup, picture, type Picture } from "./text";
 
 function need(id: string): HTMLElement {
   const el = document.querySelector(id);
@@ -14,9 +14,6 @@ const copy = need("#rules");
 let play: Play = newPlay();
 let busy = false;
 let down = false;
-let tick = 0;
-let pending: Play | null = null;
-let pulse = 0;
 let shownCoin = -1;
 const chance = live(seeded(1));
 
@@ -38,53 +35,26 @@ function seeded(seed: number): () => number {
   };
 }
 
-function stopPulse() {
-  window.clearInterval(pulse);
-  pulse = 0;
-}
-
-async function land() {
-  if (!pending) return;
-  const before = play;
-  const landed = pending;
-  const from = tick;
-  pending = null;
-  down = false;
-  stopPulse();
+async function playSpin(next: Play) {
   busy = true;
-  const list = coast(before, landed, from);
+  const list = coast(play, next, 0);
   for (let i = 0; i < list.length; i++) {
-    draw(list[i]!, landed.coin);
+    draw(list[i]!, next.coin);
     if (i < list.length - 1) await new Promise((resolve) => setTimeout(resolve, list[i]!.wait));
   }
-  play = landed;
+  play = next;
   busy = false;
 }
 
 function press(key: "spin" | "coinUp" | "coinDown") {
+  if (busy || down) return;
   if (key !== "spin") {
-    if (down || busy) return;
     play = act(play, key, chance);
     draw(picture(play), play.coin);
     return;
   }
-  if (down || busy) return;
-  const after = act(play, "spin", chance);
-  const kind = play.phase.kind;
-  const rolls = kind === "arm" || kind === "hold" || ((kind === "base" || kind === "free") && after.rows !== play.rows);
-  if (!rolls) {
-    play = after;
-    draw(picture(play), play.coin);
-    return;
-  }
   down = true;
-  pending = after;
-  tick = 0;
-  draw(whirl(play, after, tick), after.coin);
-  pulse = window.setInterval(() => {
-    tick += 1;
-    if (pending) draw(whirl(play, pending, tick), pending.coin);
-  }, 36);
+  void playSpin(act(play, "spin", chance));
 }
 
 draw(picture(play), play.coin);
@@ -97,9 +67,9 @@ document.addEventListener("keydown", (event) => {
 });
 
 document.addEventListener("keyup", (event) => {
-  if ((event.key === "Enter" || event.key === " ") && down) void land();
+  if (event.key === "Enter" || event.key === " ") down = false;
 });
 
 window.addEventListener("blur", () => {
-  if (down) void land();
+  down = false;
 });

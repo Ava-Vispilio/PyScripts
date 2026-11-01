@@ -406,7 +406,6 @@ function box(label) {
 }
 var BOARD = 53;
 var WIDTHS = [13, 12, 13, 12];
-var REEL_PACE = 36;
 var ORB_PACE = 64;
 function under(label, value, width) {
   const name = center(label, width);
@@ -547,11 +546,6 @@ function reelSpin(before, after) {
     return after.rows !== before.rows;
   return false;
 }
-function whirl(before, after, tick) {
-  if (before.phase.kind === "arm" || before.phase.kind === "hold")
-    return cover(after, openings(before, after), tick, ORB_PACE);
-  return rolling(after, tick, [1e9, 1e9, 1e9, 1e9, 1e9], REEL_PACE);
-}
 function coast(before, after, from) {
   if (!reelSpin(before, after))
     return [picture(after)];
@@ -628,9 +622,6 @@ var copy = need("#rules");
 var play = newPlay();
 var busy = false;
 var down = false;
-var tick = 0;
-var pending = null;
-var pulse = 0;
 var shownCoin = -1;
 var chance = live(seeded(1));
 function draw(pic, coin) {
@@ -649,56 +640,27 @@ function seeded(seed) {
     return state / 2 ** 32;
   };
 }
-function stopPulse() {
-  window.clearInterval(pulse);
-  pulse = 0;
-}
-async function land2() {
-  if (!pending)
-    return;
-  const before = play;
-  const landed = pending;
-  const from = tick;
-  pending = null;
-  down = false;
-  stopPulse();
+async function playSpin(next) {
   busy = true;
-  const list = coast(before, landed, from);
+  const list = coast(play, next, 0);
   for (let i = 0;i < list.length; i++) {
-    draw(list[i], landed.coin);
+    draw(list[i], next.coin);
     if (i < list.length - 1)
       await new Promise((resolve) => setTimeout(resolve, list[i].wait));
   }
-  play = landed;
+  play = next;
   busy = false;
 }
 function press(key) {
+  if (busy || down)
+    return;
   if (key !== "spin") {
-    if (down || busy)
-      return;
     play = act(play, key, chance);
     draw(picture(play), play.coin);
     return;
   }
-  if (down || busy)
-    return;
-  const after = act(play, "spin", chance);
-  const kind = play.phase.kind;
-  const rolls = kind === "arm" || kind === "hold" || (kind === "base" || kind === "free") && after.rows !== play.rows;
-  if (!rolls) {
-    play = after;
-    draw(picture(play), play.coin);
-    return;
-  }
   down = true;
-  pending = after;
-  tick = 0;
-  draw(whirl(play, after, tick), after.coin);
-  pulse = window.setInterval(() => {
-    tick += 1;
-    if (pending)
-      draw(whirl(play, pending, tick), pending.coin);
-  }, 36);
+  playSpin(act(play, "spin", chance));
 }
 draw(picture(play), play.coin);
 document.addEventListener("keydown", (event) => {
@@ -709,10 +671,9 @@ document.addEventListener("keydown", (event) => {
   press(key);
 });
 document.addEventListener("keyup", (event) => {
-  if ((event.key === "Enter" || event.key === " ") && down)
-    land2();
+  if (event.key === "Enter" || event.key === " ")
+    down = false;
 });
 window.addEventListener("blur", () => {
-  if (down)
-    land2();
+  down = false;
 });
