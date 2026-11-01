@@ -289,7 +289,7 @@ export function ansi(pic: Picture): string {
   const col = (text: string, tone: Tone, look: Look, i: number) => paint(SGR[tone] + LOOK[look], center(text, width[i] ?? 12));
   const meters = pic.meters.map((meter, i) => col(meter.name, meter.tone, "still", i)).join(" ");
   const values = pic.meters.map((meter, i) => col(meter.value, meter.tone, meter.look, i)).join(" ");
-  const ink = (cell: Cell) => (cell.look === "win" ? "30;106" : SGR[cell.tone] + LOOK[cell.look]);
+  const ink = (cell: Cell) => (cell.look === "win" ? "30;107" : SGR[cell.tone] + LOOK[cell.look]);
   const rows = pic.rows.map((line) => line.map((cell) => paint(ink(cell), cell.text)).join("  ")).join("\n");
   const above = pic.spin ? paint(BAR[pic.bar], center(pic.spin.trim(), BOARD)) : "";
   const lines = [paint(SGR.gold, "AUTUMN MOON"), "", meters, values, above, rows, "", paint("37", pic.credits), paint("33", pic.feature)];
