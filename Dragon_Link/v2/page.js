@@ -12,8 +12,8 @@ var LINE = {
   DRGN: { 3: 40, 4: 150, 5: 800 }
 };
 var COINS = [1, 2, 5, 10];
-var BASE_HOLD = "FEATURE: Collect 6 or more ORB symbols for HOLD & SPIN";
-var HOLD_RULE = "FEATURE: Reset to 3 respins whenever a new ORB lands";
+var BASE_HOLD = "TIP: 6 or more ORB symbols start HOLD & SPIN";
+var HOLD_RULE = "TIP: A new ORB resets the respins to 3";
 var REEL0 = ["9", "10", "J", "Q", "K", "9", "10", "FAN", "KOI", "LOTUS", "DRGN", "MOON", "ORB", "Q", "K", "9"];
 var REEL = ["9", "10", "J", "Q", "K", "WILD", "FAN", "KOI", "LOTUS", "DRGN", "MOON", "ORB", "9", "10", "J", "Q"];
 var DOORS = ["9", "10", "J", "Q", "K", "FAN", "KOI", "LOTUS", "DRGN", "ORB", "ORB", "FAN"];
@@ -115,7 +115,7 @@ function show(play) {
 }
 function featureOf(phase) {
   if (phase.kind === "free" || phase.kind === "doors") {
-    return `FEATURE: Every door opens onto the same symbol, ${phase.left} free games left`;
+    return `TIP: Doors open onto one symbol, ${phase.left} free games left`;
   }
   if (phase.kind === "hold" || phase.kind === "arm" || phase.kind === "jackpot")
     return HOLD_RULE;

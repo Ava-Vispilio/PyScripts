@@ -49,8 +49,8 @@ const LINE: Record<Paying, Record<3 | 4 | 5, number>> = {
 };
 
 const COINS = [1, 2, 5, 10];
-const BASE_HOLD = "FEATURE: Collect 6 or more ORB symbols for HOLD & SPIN";
-const HOLD_RULE = "FEATURE: Reset to 3 respins whenever a new ORB lands";
+const BASE_HOLD = "TIP: 6 or more ORB symbols start HOLD & SPIN";
+const HOLD_RULE = "TIP: A new ORB resets the respins to 3";
 
 const REEL0 = ["9", "10", "J", "Q", "K", "9", "10", "FAN", "KOI", "LOTUS", "DRGN", "MOON", "ORB", "Q", "K", "9"];
 const REEL = ["9", "10", "J", "Q", "K", "WILD", "FAN", "KOI", "LOTUS", "DRGN", "MOON", "ORB", "9", "10", "J", "Q"];
@@ -187,7 +187,7 @@ function show(play: Omit<Play, "feature" | "status"> & { feature?: string; statu
 
 function featureOf(phase: Phase): string {
   if (phase.kind === "free" || phase.kind === "doors") {
-    return `FEATURE: Every door opens onto the same symbol, ${phase.left} free games left`;
+    return `TIP: Doors open onto one symbol, ${phase.left} free games left`;
   }
   if (phase.kind === "hold" || phase.kind === "arm" || phase.kind === "jackpot") return HOLD_RULE;
   return BASE_HOLD;
