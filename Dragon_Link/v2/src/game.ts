@@ -273,6 +273,25 @@ function settle(play: Play, grid: Rows, resume: Resume): Play {
   });
 }
 
+export function hotCells(grid: Rows): boolean[][] {
+  const hot = [0, 1, 2].map(() => [false, false, false, false, false]);
+  for (const line of LINES) {
+    const symbol = grid[line[0]!]![0]!;
+    if (!isPaying(symbol)) continue;
+    let run = 1;
+    for (let reel = 1; reel < 5; reel++) {
+      const symbolOnLine = grid[line[reel]!]![reel]!;
+      if (symbolOnLine === symbol || symbolOnLine === "WILD") run++;
+      else break;
+    }
+    if (run >= 3) for (let reel = 0; reel < run; reel++) hot[line[reel]!]![reel] = true;
+  }
+  if (flat(grid).filter((symbol) => symbol === "MOON").length >= 3) {
+    grid.forEach((line, r) => line.forEach((symbol, c) => symbol === "MOON" && (hot[r]![c] = true)));
+  }
+  return hot;
+}
+
 function scoreGrid(grid: Rows, coin: number): { pay: number; moons: number; orbs: number } {
   let coins = 0;
   for (const line of LINES) {
@@ -405,14 +424,47 @@ function returned(play: Omit<Play, "feature" | "status" | "phase">, resume: Resu
   return show({ ...play, phase: { kind: "base" }, feature: BASE_HOLD, status: "Press Enter to spin." });
 }
 
-export function rulesText(coin: number): string {
-  const bet = 50 * coin;
+const PARODY = [
+  "This is an unofficial parody of Aristocrat's Dragon Link Autumn Moon. Aristocrat did not make it and does not endorse it.",
+  "It grew out of the Alberta Tech reel \"Vibe Coding is Gambling\" and Dave Eddy's YSAP Link stitch of that reel.",
+  "Nothing here is real wagering. Credits are pretend, cost nothing, and cannot be cashed out.",
+  "A text screen has no cabinet art, no sound, and no linked jackpot. The Major and Grand meters grow only from your own spins in this session.",
+] as const;
+
+const ODDS = "Reel strips, weights, and odds are original to this parody and are not Aristocrat's math.";
+
+/** The rules article. Parody sentences carry no digits. Every number comes from the pay list. */
+export function rulesHtml(coin: number): string {
   const money = (coins: number) => Math.floor(coins * coin).toLocaleString("en-US");
-  return [
-    "This is an unofficial parody of Aristocrat's Dragon Link Autumn Moon.",
-    "It grew out of the Alberta Tech reel \"Vibe Coding is Gambling\" and Dave Eddy's YSAP Link stitch.",
-    "Credits are pretend. Reel odds are original to this parody.",
-    `Coin ${coin}. Bet ${money(50)}. Five moons pay ${money(250 * 50)}.`,
-    "Six ORB symbols start Hold & Spin. A new orb resets the count to three. Fifteen orbs pay Grand.",
-  ].join("\n");
+  const esc = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const pays = (Object.keys(LINE) as Paying[])
+    .map((symbol) => {
+      const pay = LINE[symbol];
+      return `<tr><th>${symbol}</th><td>${money(pay[3])}</td><td>${money(pay[4])}</td><td>${money(pay[5])}</td></tr>`;
+    })
+    .join("\n");
+  const story = PARODY.map((sentence) => `<p>${esc(sentence)}</p>`).join("\n");
+  return `
+<h2>What this is</h2>
+${story}
+<h2>Rules of this version</h2>
+<p>Coin ${coin}. Every credit amount below is for this coin and changes when you change the coin.</p>
+<ul>
+  <li>5 reels, 3 rows, 50 fixed lines. Lines pay left to right, starting on the first reel. The bet is ${money(50)} credits: 50 lines times the coin. You start with 50,000 credits.</li>
+  <li>WILD lands on every reel except the first. It stands in for every paying symbol. It does not stand in for MOON or ORB, and ORB never pays on a line.</li>
+  <li>MOON pays anywhere on the screen. Three moons pay ${money(150)}, four pay ${money(1000)}, and five pay ${money(12_500)}, which is 250 times the bet. Three or more moons also start 6 free games. Three more moons during free games add 6 more.</li>
+  <li>Free spins can land DOOR stacks. Every door on one spin opens onto the same symbol. That symbol can be ORB, but never WILD or MOON.</li>
+  <li>6 or more ORB start Hold and Spin with 3 respins. Each new orb locks and resets the count to 3. Orbs show credits (${[50, 100, 150, 250, 400, 750].map((n) => money(n)).join(", ")}) or a jackpot name. Only one MAJOR can show at a time.</li>
+  <li>MINI pays ${money(1000)}. MINOR pays ${money(5000)}. MAJOR pays its meter, which starts at ${money(25_000)}. Filling all 15 cells pays the GRAND meter, which starts at ${money(250_000)}. Both meters grow a little with every paid spin and reset after they pay.</li>
+  <li>A Major or Grand win pauses the game until you collect it. Spin does nothing during that pause.</li>
+  <li>Hold and Spin started during free games returns to those free games.</li>
+  <li>The coin changes only in the base game.</li>
+  <li>${esc(ODDS)}</li>
+</ul>
+<table>
+  <thead><tr><th>Line pays</th><th>Three</th><th>Four</th><th>Five</th></tr></thead>
+  <tbody>
+${pays}
+  </tbody>
+</table>`;
 }

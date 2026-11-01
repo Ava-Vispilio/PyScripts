@@ -198,6 +198,29 @@ function settle(play, grid, resume) {
     status: "Six orbs landed. Press Enter to start Hold & Spin."
   });
 }
+function hotCells(grid) {
+  const hot = [0, 1, 2].map(() => [false, false, false, false, false]);
+  for (const line of LINES) {
+    const symbol = grid[line[0]][0];
+    if (!isPaying(symbol))
+      continue;
+    let run = 1;
+    for (let reel = 1;reel < 5; reel++) {
+      const symbolOnLine = grid[line[reel]][reel];
+      if (symbolOnLine === symbol || symbolOnLine === "WILD")
+        run++;
+      else
+        break;
+    }
+    if (run >= 3)
+      for (let reel = 0;reel < run; reel++)
+        hot[line[reel]][reel] = true;
+  }
+  if (flat(grid).filter((symbol) => symbol === "MOON").length >= 3) {
+    grid.forEach((line, r) => line.forEach((symbol, c) => symbol === "MOON" && (hot[r][c] = true)));
+  }
+  return hot;
+}
 function scoreGrid(grid, coin) {
   let coins = 0;
   for (const line of LINES) {
@@ -327,47 +350,248 @@ function returned(play, resume) {
   }
   return show({ ...play, phase: { kind: "base" }, feature: BASE_HOLD, status: "Press Enter to spin." });
 }
-function rulesText(coin) {
-  const bet = 50 * coin;
+var PARODY = [
+  "This is an unofficial parody of Aristocrat's Dragon Link Autumn Moon. Aristocrat did not make it and does not endorse it.",
+  `It grew out of the Alberta Tech reel "Vibe Coding is Gambling" and Dave Eddy's YSAP Link stitch of that reel.`,
+  "Nothing here is real wagering. Credits are pretend, cost nothing, and cannot be cashed out.",
+  "A text screen has no cabinet art, no sound, and no linked jackpot. The Major and Grand meters grow only from your own spins in this session."
+];
+var ODDS = "Reel strips, weights, and odds are original to this parody and are not Aristocrat's math.";
+function rulesHtml(coin) {
   const money = (coins) => Math.floor(coins * coin).toLocaleString("en-US");
-  return [
-    "This is an unofficial parody of Aristocrat's Dragon Link Autumn Moon.",
-    `It grew out of the Alberta Tech reel "Vibe Coding is Gambling" and Dave Eddy's YSAP Link stitch.`,
-    "Credits are pretend. Reel odds are original to this parody.",
-    `Coin ${coin}. Bet ${money(50)}. Five moons pay ${money(250 * 50)}.`,
-    "Six ORB symbols start Hold & Spin. A new orb resets the count to three. Fifteen orbs pay Grand."
-  ].join(`
+  const esc = (text) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const pays = Object.keys(LINE).map((symbol) => {
+    const pay = LINE[symbol];
+    return `<tr><th>${symbol}</th><td>${money(pay[3])}</td><td>${money(pay[4])}</td><td>${money(pay[5])}</td></tr>`;
+  }).join(`
 `);
+  const story = PARODY.map((sentence) => `<p>${esc(sentence)}</p>`).join(`
+`);
+  return `
+<h2>What this is</h2>
+${story}
+<h2>Rules of this version</h2>
+<p>Coin ${coin}. Every credit amount below is for this coin and changes when you change the coin.</p>
+<ul>
+  <li>5 reels, 3 rows, 50 fixed lines. Lines pay left to right, starting on the first reel. The bet is ${money(50)} credits: 50 lines times the coin. You start with 50,000 credits.</li>
+  <li>WILD lands on every reel except the first. It stands in for every paying symbol. It does not stand in for MOON or ORB, and ORB never pays on a line.</li>
+  <li>MOON pays anywhere on the screen. Three moons pay ${money(150)}, four pay ${money(1000)}, and five pay ${money(12500)}, which is 250 times the bet. Three or more moons also start 6 free games. Three more moons during free games add 6 more.</li>
+  <li>Free spins can land DOOR stacks. Every door on one spin opens onto the same symbol. That symbol can be ORB, but never WILD or MOON.</li>
+  <li>6 or more ORB start Hold and Spin with 3 respins. Each new orb locks and resets the count to 3. Orbs show credits (${[50, 100, 150, 250, 400, 750].map((n) => money(n)).join(", ")}) or a jackpot name. Only one MAJOR can show at a time.</li>
+  <li>MINI pays ${money(1000)}. MINOR pays ${money(5000)}. MAJOR pays its meter, which starts at ${money(25000)}. Filling all 15 cells pays the GRAND meter, which starts at ${money(250000)}. Both meters grow a little with every paid spin and reset after they pay.</li>
+  <li>A Major or Grand win pauses the game until you collect it. Spin does nothing during that pause.</li>
+  <li>Hold and Spin started during free games returns to those free games.</li>
+  <li>The coin changes only in the base game.</li>
+  <li>${esc(ODDS)}</li>
+</ul>
+<table>
+  <thead><tr><th>Line pays</th><th>Three</th><th>Four</th><th>Five</th></tr></thead>
+  <tbody>
+${pays}
+  </tbody>
+</table>`;
 }
 
 // src/text.ts
-var WIDTH = 14;
 function commas(n) {
   return Math.floor(n).toLocaleString("en-US");
 }
-function cell(label) {
-  return `[ ${label.padEnd(5)} ]`;
+function center(text, width) {
+  const pad = Math.max(0, width - text.length);
+  const left = Math.floor(pad / 2);
+  return " ".repeat(left) + text + " ".repeat(pad - left);
 }
-function plain(play) {
+function box(label) {
+  return `[ ${center(label, 5)} ]`;
+}
+var BOARD = 63;
+var REEL02 = ["9", "10", "J", "Q", "K", "FAN", "KOI", "LOTUS", "DRGN", "MOON", "ORB"];
+var REEL2 = ["9", "10", "J", "Q", "K", "WILD", "FAN", "KOI", "LOTUS", "DRGN", "MOON", "ORB"];
+var FACES2 = ["50", "100", "150", "250", "400", "750", "MINI", "MINOR", "MAJOR"];
+function toneOf(label) {
+  switch (label) {
+    case "FAN":
+      return "fan";
+    case "KOI":
+      return "koi";
+    case "LOTUS":
+      return "lotus";
+    case "DRGN":
+      return "dragon";
+    case "WILD":
+      return "wild";
+    case "MOON":
+      return "moon";
+    case "ORB":
+      return "orb";
+    case "DOOR":
+      return "door";
+    case "MINI":
+      return "mini";
+    case "MINOR":
+      return "minor";
+    case "MAJOR":
+      return "major";
+    case "GRAND":
+      return "grand";
+    default:
+      return /^\d+$/.test(label) ? "orb" : "card";
+  }
+}
+function lockedAt(play, r, c) {
+  const phase = play.phase;
+  if (phase.kind !== "hold" && phase.kind !== "jackpot")
+    return false;
+  return phase.locked[r]?.[c] != null;
+}
+function callout(play) {
+  const phase = play.phase;
+  if (phase.kind === "jackpot") {
+    const name = phase.pending[0]?.name ?? "MAJOR";
+    return { banner: name, bannerTone: name === "GRAND" ? "grand" : "major" };
+  }
+  if (phase.kind === "hold")
+    return { banner: `HOLD & SPIN    ${phase.respins} RESPINS`, bannerTone: "orb" };
+  if (phase.kind === "arm")
+    return { banner: "HOLD & SPIN", bannerTone: "orb" };
+  if (phase.kind === "doors")
+    return { banner: "MYSTERY DOORS", bannerTone: "door" };
+  if (phase.kind === "free")
+    return { banner: `FREE GAMES    ${phase.left} LEFT`, bannerTone: "moon" };
+  if (play.win > 0)
+    return { banner: "WINNER", bannerTone: "gold" };
+  return { banner: "", bannerTone: "gold" };
+}
+function barOf(play) {
+  if (play.status.startsWith("Not enough"))
+    return "broke";
+  if (play.phase.kind === "jackpot")
+    return play.phase.pending[0]?.name === "GRAND" ? "grand" : "major";
+  if (play.phase.kind === "doors")
+    return "door";
+  if (play.phase.kind === "arm" || play.phase.kind === "hold")
+    return "hold";
+  if (play.phase.kind === "free")
+    return "free";
+  if (play.win > 0)
+    return "win";
+  return "play";
+}
+function picture(play) {
   const bet = 50 * play.coin;
   const meter = (coins) => commas(coins * play.coin);
-  const head = ["MINI", "MINOR", "MAJOR", "GRAND"].map((name) => name.padEnd(WIDTH)).join("");
-  const values = [meter(1000), meter(5000), meter(play.major), meter(play.grand)].map((value) => value.padEnd(WIDTH)).join("");
-  const rows = play.rows.map((row) => row.map(cell).join("  ")).join(`
-`);
-  return [
-    "AUTUMN MOON",
-    "",
-    head.trimEnd(),
-    values.trimEnd(),
-    "",
+  const holding = play.phase.kind === "hold" || play.phase.kind === "jackpot";
+  const hot = holding ? [] : hotCells(play.rows);
+  const prize = play.phase.kind === "jackpot" ? play.phase.pending[0]?.name : undefined;
+  const meters = [
+    ["MINI", meter(1000), "mini"],
+    ["MINOR", meter(5000), "minor"],
+    ["MAJOR", meter(play.major), "major"],
+    ["GRAND", meter(play.grand), "grand"]
+  ].map(([name, value, tone]) => ({ name, value, tone, look: prize === name ? "win" : "still" }));
+  const rows = play.rows.map((line, r) => line.map((label, c) => {
+    const locked = lockedAt(play, r, c);
+    const dim = holding && !locked;
+    const look = hot[r]?.[c] ? "win" : locked || play.phase.kind === "arm" && label === "ORB" ? "lock" : "still";
+    return { text: box(label), tone: dim ? "dim" : toneOf(label), look };
+  }));
+  return {
+    meters: [...meters],
     rows,
-    "",
-    `credits: ${commas(play.credits)}     bet: ${commas(bet)}     win: ${commas(play.win)}`,
-    play.feature,
-    play.status
-  ].join(`
+    credits: `credits: ${commas(play.credits)}     bet: ${commas(bet)}     win: ${commas(play.win)}`,
+    feature: play.feature,
+    status: play.status,
+    spin: "",
+    bar: barOf(play),
+    wait: 0,
+    ...callout(play)
+  };
+}
+function stopsFor(rows) {
+  const base = [6, 9, 12, 16, 20];
+  return base.map((ticks, reel) => ticks + (rows[0]?.[reel] ?? "A").charCodeAt(0) % 3);
+}
+function rolling(after, tick, stops) {
+  const pic = picture(after);
+  const moving = stops.map((stop) => tick < stop);
+  pic.rows = pic.rows.map((line, r) => line.map((cell, reel) => {
+    if (!moving[reel])
+      return { ...cell, look: "still" };
+    const strip = reel === 0 ? REEL02 : REEL2;
+    const label = strip[(tick + r * 3 + reel * 2) % strip.length];
+    return { text: box(label), tone: toneOf(label), look: "spin" };
+  }));
+  return {
+    ...pic,
+    spin: center("SPINNING", BOARD),
+    banner: "",
+    bar: "spin",
+    status: "Reels stopping.",
+    wait: 32 + tick * 14
+  };
+}
+function frames(before, after) {
+  if (before.rows === after.rows && before.phase.kind === after.phase.kind)
+    return [picture(after)];
+  if (before.phase.kind === "base" || before.phase.kind === "free") {
+    const stops = stopsFor(after.rows);
+    const last = Math.max(...stops);
+    const rollingFrames = Array.from({ length: last }, (_, tick) => rolling(after, tick, stops));
+    return [...rollingFrames, picture(after)];
+  }
+  if (before.phase.kind === "arm" || before.phase.kind === "hold")
+    return land(before, after);
+  return [picture(after)];
+}
+function land(before, after) {
+  const end = picture(after);
+  const spots = [];
+  after.rows.forEach((line, r) => line.forEach((label, c) => label !== before.rows[r]?.[c] && spots.push([r, c])));
+  if (spots.length === 0 && before.phase.kind === "hold") {
+    before.phase.locked.forEach((line, r) => line.forEach((cell, c) => cell == null && spots.push([r, c])));
+    if (spots.length === 0)
+      return [end];
+    return [...[0, 1, 2].map((tick) => cover(after, spots, tick)), end];
+  }
+  if (spots.length === 0)
+    return [end];
+  const rollingFrames = [0, 1, 2, 3, 4].map((tick) => cover(after, spots, tick));
+  return [...rollingFrames, end];
+}
+function cover(play, open, tick) {
+  const pic = picture(play);
+  for (const [r, c] of open) {
+    const row = pic.rows[r];
+    const label = FACES2[(tick + r + c) % FACES2.length];
+    if (row)
+      row[c] = { text: box(label), tone: toneOf(label), look: "spin" };
+  }
+  return { ...pic, spin: center("HOLD & SPIN", BOARD), banner: "", bar: "spin", status: "Orbs landing.", wait: 40 + tick * 28 };
+}
+function esc(text) {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+}
+function span(text, tone, look) {
+  return `<span class="${tone} ${look}">${esc(text)}</span>`;
+}
+function markup(pic) {
+  const col = (text, tone, look) => span(center(text, 14), tone, look);
+  const meters = pic.meters.map((meter) => col(meter.name, meter.tone, "still")).join("");
+  const values = pic.meters.map((meter) => col(meter.value, meter.tone, meter.look)).join("");
+  const rows = pic.rows.map((line) => line.map((cell) => span(cell.text, cell.tone, cell.look)).join("  ")).join(`
 `);
+  const spin = pic.spin ? `<span class="spinbar">${esc(pic.spin)}</span>` : "";
+  const banner = pic.banner ? `${span(pic.banner, pic.bannerTone, "still")}
+` : "";
+  return `${span("AUTUMN MOON", "gold", "still")}
+
+${meters.trimEnd()}
+${values.trimEnd()}
+${spin}
+${rows}
+
+${span(pic.credits, "card", "still")}
+${banner}${span(pic.feature, "gold", "still")}`;
 }
 
 // src/page.ts
@@ -381,14 +605,17 @@ var board = need("#screen");
 var bar = need("#status");
 var copy = need("#rules");
 var play = newPlay();
+var busy = false;
+var shownCoin = -1;
 var chance = live(seeded(1));
-function draw(next) {
-  const text = plain(next);
-  const cut = text.lastIndexOf(`
-`);
-  board.textContent = text.slice(0, cut);
-  bar.textContent = text.slice(cut + 1);
-  copy.textContent = rulesText(next.coin);
+function draw(pic, coin) {
+  board.innerHTML = markup(pic);
+  bar.textContent = pic.status;
+  bar.className = pic.bar;
+  if (coin !== shownCoin) {
+    copy.innerHTML = rulesHtml(coin);
+    shownCoin = coin;
+  }
 }
 function seeded(seed) {
   let state = seed >>> 0;
@@ -397,12 +624,22 @@ function seeded(seed) {
     return state / 2 ** 32;
   };
 }
-draw(play);
+async function show2(next) {
+  const list = frames(play, next);
+  busy = true;
+  for (let i = 0;i < list.length; i++) {
+    draw(list[i], next.coin);
+    if (i < list.length - 1)
+      await new Promise((resolve) => setTimeout(resolve, list[i].wait));
+  }
+  play = next;
+  busy = false;
+}
+draw(picture(play), play.coin);
 document.addEventListener("keydown", (event) => {
   const key = event.key === "Enter" || event.key === " " ? "spin" : event.key === "ArrowRight" ? "coinUp" : event.key === "ArrowLeft" ? "coinDown" : null;
-  if (!key)
+  if (!key || busy)
     return;
   event.preventDefault();
-  play = act(play, key, chance);
-  draw(play);
+  show2(act(play, key, chance));
 });

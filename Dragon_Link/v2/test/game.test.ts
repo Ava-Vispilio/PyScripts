@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
-import { act, live, newPlay, scripted, type Face, type Row, type Rows } from "../src/game";
-import { plain } from "../src/text";
+import { act, hotCells, live, newPlay, rulesHtml, scripted, type Face, type Row, type Rows } from "../src/game";
+import { frames, picture, plain } from "../src/text";
 
 const row = (a: string, b: string, c: string, d: string, e: string): Row => [a, b, c, d, e];
 const grid = (cells: string[]): Rows => [
@@ -13,7 +13,7 @@ const face = (label: string, pay: number): Face => ({ label, pay });
 test("the screen is the terminal text", () => {
   const text = plain(newPlay());
   expect(text.startsWith("AUTUMN MOON\n")).toBe(true);
-  expect(text).toContain("[ DRGN  ]  [ MOON  ]  [ ORB   ]  [ LOTUS ]  [ FAN   ]");
+  expect(text).toContain("[ DRGN  ]  [ MOON  ]  [  ORB  ]  [ LOTUS ]  [  FAN  ]");
   expect(text).toContain("credits: 50,000     bet: 50     win: 0");
   expect(text.endsWith("Press Enter to spin.")).toBe(true);
 });
@@ -70,6 +70,41 @@ test("a new orb resets the respin count and fifteen orbs pay Grand", () => {
   grand = act(grand, "spin", scripted({ faces: many }));
   expect(grand.status.startsWith("GRAND ")).toBe(true);
   expect(grand.status.endsWith("Press Enter to collect.")).toBe(true);
+});
+
+test("winning cells light up and the reels stop one at a time", () => {
+  const koi = grid("KOI KOI KOI Q LOTUS KOI KOI KOI K DRGN KOI KOI KOI FAN 9".split(" "));
+  const start = newPlay();
+  const after = act(start, "spin", scripted({ windows: [koi] }));
+  const hot = hotCells(after.rows);
+  expect(hot[0]![0] && hot[0]![1] && hot[0]![2]).toBe(true);
+  expect(hot[0]![3]).toBe(false);
+  const pics = frames(start, after);
+  expect(pics.length).toBeGreaterThan(5);
+  expect(pics[0]!.spin.trim()).toBe("SPINNING");
+  expect(pics[0]!.bar).toBe("spin");
+  expect(pics[0]!.rows[0]![4]!.look).toBe("spin");
+  expect(pics[0]!.wait).toBeLessThan(pics.at(-2)!.wait);
+  const settled = pics.find((pic) => pic.rows[0]![0]!.look === "still" && pic.rows[0]![4]!.look === "spin");
+  expect(settled).toBeTruthy();
+  expect(pics.at(-1)!.rows[0]![0]!.look).toBe("win");
+  expect(pics.at(-1)!.banner).toBe("WINNER");
+  expect(pics.at(-1)!.bar).toBe("win");
+  expect(pics.at(-1)!.spin).toBe("");
+  expect(picture(start).rows[0]![0]!.tone).toBe("dragon");
+  expect(picture(start).rows[0]![2]!.tone).toBe("orb");
+  expect(picture(start).rows[2]![0]!.text).toBe("[   9   ]");
+  expect(picture(start).bar).toBe("play");
+});
+
+test("the rules article explains the parody and the pays", () => {
+  const html = rulesHtml(1);
+  expect(html).toContain("What this is");
+  expect(html).toContain("Line pays");
+  expect(html).toContain("<th>DRGN</th><td>40</td><td>150</td><td>800</td>");
+  expect(html).toContain("Aristocrat did not make it");
+  const story = html.slice(html.indexOf("<h2>What this is</h2>"), html.indexOf("<h2>Rules of this version</h2>"));
+  expect(story.replace(/<[^>]+>/g, "")).not.toMatch(/\d/);
 });
 
 test("the same seed plays the same game", () => {

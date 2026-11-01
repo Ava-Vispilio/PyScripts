@@ -1,13 +1,7 @@
 import { act, live, newPlay, type Play } from "./game";
-import { plain } from "./text";
+import { ansi, frames, picture } from "./text";
 
-const paint = (play: Play) => {
-  const text = plain(play);
-  const cut = text.lastIndexOf("\n");
-  const body = text.slice(0, cut);
-  const status = text.slice(cut + 1).padEnd(72);
-  process.stdout.write(`\x1b[H\x1b[J\x1b[33m${body}\x1b[0m\n\x1b[41;97m${status}\x1b[0m\n`);
-};
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const keyOf = (key: string): "spin" | "coinUp" | "coinDown" | "quit" | null => {
   if (key === "\r" || key === "\n" || key === " ") return "spin";
@@ -22,17 +16,28 @@ if (import.meta.main) {
   stdin.setRawMode(true);
   stdin.resume();
   let play = newPlay();
+  let busy = false;
   const chance = live();
-  paint(play);
+  process.stdout.write(ansi(picture(play)));
   stdin.on("data", (buf) => {
-    const key = keyOf(buf.toString("utf8"));
+    void onKey(buf.toString("utf8"));
+  });
+
+  async function onKey(raw: string) {
+    const key = keyOf(raw);
     if (key === "quit") {
       stdin.setRawMode(false);
       process.exit(0);
     }
-    if (key === "spin" || key === "coinUp" || key === "coinDown") {
-      play = act(play, key, chance);
-      paint(play);
+    if (busy || (key !== "spin" && key !== "coinUp" && key !== "coinDown")) return;
+    const next = act(play, key, chance);
+    const list = frames(play, next);
+    busy = true;
+    for (let i = 0; i < list.length; i++) {
+      process.stdout.write(ansi(list[i]!));
+      if (i < list.length - 1) await sleep(list[i]!.wait);
     }
-  });
+    play = next;
+    busy = false;
+  }
 }

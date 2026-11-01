@@ -1,0 +1,304 @@
+import { hotCells, type Play } from "./game";
+
+export type Tone =
+  | "card"
+  | "fan"
+  | "koi"
+  | "lotus"
+  | "dragon"
+  | "wild"
+  | "moon"
+  | "orb"
+  | "mini"
+  | "minor"
+  | "major"
+  | "grand"
+  | "door"
+  | "dim"
+  | "gold";
+
+export type Look = "still" | "spin" | "win" | "lock";
+
+export type Cell = { text: string; tone: Tone; look: Look };
+
+export type Bar = "play" | "win" | "free" | "door" | "hold" | "major" | "grand" | "spin" | "broke";
+
+export type Picture = {
+  meters: { name: string; value: string; tone: Tone; look: Look }[];
+  /** A bar directly above the columns. Empty once the reels have stopped. */
+  spin: string;
+  rows: Cell[][];
+  credits: string;
+  banner: string;
+  bannerTone: Tone;
+  feature: string;
+  status: string;
+  bar: Bar;
+  /** How long to hold this frame before the next one, in milliseconds. */
+  wait: number;
+};
+
+const SGR: Record<Tone, string> = {
+  card: "37",
+  fan: "33",
+  koi: "38;5;209",
+  lotus: "38;5;213",
+  dragon: "91",
+  wild: "93;1",
+  moon: "93;1",
+  orb: "38;5;208;1",
+  mini: "32;1",
+  minor: "34;1",
+  major: "35;1",
+  grand: "31;1",
+  door: "34;1",
+  dim: "90",
+  gold: "33;1",
+};
+
+const LOOK: Record<Look, string> = { still: "", spin: ";2", win: ";7", lock: ";1" };
+
+function commas(n: number): string {
+  return Math.floor(n).toLocaleString("en-US");
+}
+
+function center(text: string, width: number): string {
+  const pad = Math.max(0, width - text.length);
+  const left = Math.floor(pad / 2);
+  return " ".repeat(left) + text + " ".repeat(pad - left);
+}
+
+function box(label: string): string {
+  return `[ ${center(label, 5)} ]`;
+}
+
+const BOARD = 63;
+const REEL0 = ["9", "10", "J", "Q", "K", "FAN", "KOI", "LOTUS", "DRGN", "MOON", "ORB"];
+const REEL = ["9", "10", "J", "Q", "K", "WILD", "FAN", "KOI", "LOTUS", "DRGN", "MOON", "ORB"];
+const FACES = ["50", "100", "150", "250", "400", "750", "MINI", "MINOR", "MAJOR"];
+
+function toneOf(label: string): Tone {
+  switch (label) {
+    case "FAN":
+      return "fan";
+    case "KOI":
+      return "koi";
+    case "LOTUS":
+      return "lotus";
+    case "DRGN":
+      return "dragon";
+    case "WILD":
+      return "wild";
+    case "MOON":
+      return "moon";
+    case "ORB":
+      return "orb";
+    case "DOOR":
+      return "door";
+    case "MINI":
+      return "mini";
+    case "MINOR":
+      return "minor";
+    case "MAJOR":
+      return "major";
+    case "GRAND":
+      return "grand";
+    default:
+      return /^\d+$/.test(label) ? "orb" : "card";
+  }
+}
+
+function lockedAt(play: Play, r: number, c: number): boolean {
+  const phase = play.phase;
+  if (phase.kind !== "hold" && phase.kind !== "jackpot") return false;
+  return phase.locked[r]?.[c] != null;
+}
+
+/** The screen from the video, as plain text. The last line is the red bar. */
+export function plain(play: Play): string {
+  const bet = 50 * play.coin;
+  const meter = (coins: number) => commas(coins * play.coin);
+  const head = ["MINI", "MINOR", "MAJOR", "GRAND"].map((name) => center(name, 14)).join("");
+  const values = [meter(1000), meter(5000), meter(play.major), meter(play.grand)].map((value) => center(value, 14)).join("");
+  const rows = play.rows.map((row) => row.map(box).join("  ")).join("\n");
+  return ["AUTUMN MOON", "", head.trimEnd(), values.trimEnd(), "", rows, "", `credits: ${commas(play.credits)}     bet: ${commas(bet)}     win: ${commas(play.win)}`, play.feature, play.status].join("\n");
+}
+
+function callout(play: Play): { banner: string; bannerTone: Tone } {
+  const phase = play.phase;
+  if (phase.kind === "jackpot") {
+    const name = phase.pending[0]?.name ?? "MAJOR";
+    return { banner: name, bannerTone: name === "GRAND" ? "grand" : "major" };
+  }
+  if (phase.kind === "hold") return { banner: `HOLD & SPIN    ${phase.respins} RESPINS`, bannerTone: "orb" };
+  if (phase.kind === "arm") return { banner: "HOLD & SPIN", bannerTone: "orb" };
+  if (phase.kind === "doors") return { banner: "MYSTERY DOORS", bannerTone: "door" };
+  if (phase.kind === "free") return { banner: `FREE GAMES    ${phase.left} LEFT`, bannerTone: "moon" };
+  if (play.win > 0) return { banner: "WINNER", bannerTone: "gold" };
+  return { banner: "", bannerTone: "gold" };
+}
+
+function barOf(play: Play): Bar {
+  if (play.status.startsWith("Not enough")) return "broke";
+  if (play.phase.kind === "jackpot") return play.phase.pending[0]?.name === "GRAND" ? "grand" : "major";
+  if (play.phase.kind === "doors") return "door";
+  if (play.phase.kind === "arm" || play.phase.kind === "hold") return "hold";
+  if (play.phase.kind === "free") return "free";
+  if (play.win > 0) return "win";
+  return "play";
+}
+
+/** One settled screen, with a color and a highlight on every cell. */
+export function picture(play: Play): Picture {
+  const bet = 50 * play.coin;
+  const meter = (coins: number) => commas(coins * play.coin);
+  const holding = play.phase.kind === "hold" || play.phase.kind === "jackpot";
+  const hot = holding ? [] : hotCells(play.rows);
+  const prize = play.phase.kind === "jackpot" ? play.phase.pending[0]?.name : undefined;
+  const meters = (
+    [
+      ["MINI", meter(1000), "mini"],
+      ["MINOR", meter(5000), "minor"],
+      ["MAJOR", meter(play.major), "major"],
+      ["GRAND", meter(play.grand), "grand"],
+    ] as const
+  ).map(([name, value, tone]) => ({ name, value, tone, look: prize === name ? "win" : "still" }) as const);
+  const rows = play.rows.map((line, r) =>
+    line.map((label, c) => {
+      const locked = lockedAt(play, r, c);
+      const dim = holding && !locked;
+      const look: Look = hot[r]?.[c] ? "win" : locked || (play.phase.kind === "arm" && label === "ORB") ? "lock" : "still";
+      return { text: box(label), tone: dim ? "dim" : toneOf(label), look };
+    }),
+  );
+  return {
+    meters: [...meters],
+    rows,
+    credits: `credits: ${commas(play.credits)}     bet: ${commas(bet)}     win: ${commas(play.win)}`,
+    feature: play.feature,
+    status: play.status,
+    spin: "",
+    bar: barOf(play),
+    wait: 0,
+    ...callout(play),
+  };
+}
+
+function stopsFor(rows: Play["rows"]): number[] {
+  const base = [6, 9, 12, 16, 20];
+  return base.map((ticks, reel) => ticks + ((rows[0]?.[reel] ?? "A").charCodeAt(0) % 3));
+}
+
+function rolling(after: Play, tick: number, stops: number[]): Picture {
+  const pic = picture(after);
+  const moving = stops.map((stop) => tick < stop);
+  pic.rows = pic.rows.map((line, r) =>
+    line.map((cell, reel) => {
+      if (!moving[reel]) return { ...cell, look: "still" };
+      const strip = reel === 0 ? REEL0 : REEL;
+      const label = strip[(tick + r * 3 + reel * 2) % strip.length]!;
+      return { text: box(label), tone: toneOf(label), look: "spin" };
+    }),
+  );
+  return {
+    ...pic,
+    spin: center("SPINNING", BOARD),
+    banner: "",
+    bar: "spin",
+    status: "Reels stopping.",
+    wait: 32 + tick * 14,
+  };
+}
+
+/** Reel stops, door opens, and hold-and-spin landings between two plays. */
+export function frames(before: Play, after: Play): Picture[] {
+  if (before.rows === after.rows && before.phase.kind === after.phase.kind) return [picture(after)];
+  if (before.phase.kind === "base" || before.phase.kind === "free") {
+    const stops = stopsFor(after.rows);
+    const last = Math.max(...stops);
+    const rollingFrames = Array.from({ length: last }, (_, tick) => rolling(after, tick, stops));
+    return [...rollingFrames, picture(after)];
+  }
+  if (before.phase.kind === "arm" || before.phase.kind === "hold") return land(before, after);
+  return [picture(after)];
+}
+
+function land(before: Play, after: Play): Picture[] {
+  const end = picture(after);
+  const spots: [number, number][] = [];
+  after.rows.forEach((line, r) => line.forEach((label, c) => label !== before.rows[r]?.[c] && spots.push([r, c])));
+  if (spots.length === 0 && before.phase.kind === "hold") {
+    before.phase.locked.forEach((line, r) => line.forEach((cell, c) => cell == null && spots.push([r, c])));
+    if (spots.length === 0) return [end];
+    return [...[0, 1, 2].map((tick) => cover(after, spots, tick)), end];
+  }
+  if (spots.length === 0) return [end];
+  const rollingFrames = [0, 1, 2, 3, 4].map((tick) => cover(after, spots, tick));
+  return [...rollingFrames, end];
+}
+
+function cover(play: Play, open: [number, number][], tick: number): Picture {
+  const pic = picture(play);
+  for (const [r, c] of open) {
+    const row = pic.rows[r];
+    const label = FACES[(tick + r + c) % FACES.length]!;
+    if (row) row[c] = { text: box(label), tone: toneOf(label), look: "spin" };
+  }
+  return { ...pic, spin: center("HOLD & SPIN", BOARD), banner: "", bar: "spin", status: "Orbs landing.", wait: 40 + tick * 28 };
+}
+
+function paint(codes: string, text: string): string {
+  return `\x1b[${codes}m${text}\x1b[0m`;
+}
+
+const BAR: Record<Bar, string> = {
+  play: "42;97",
+  win: "43;30",
+  free: "44;97",
+  door: "104;97",
+  hold: "48;5;208;97",
+  major: "45;97",
+  grand: "41;97",
+  spin: "43;30",
+  broke: "100;37",
+};
+
+/** The picture as terminal color. The status line takes its color from the feature. */
+export function ansi(pic: Picture): string {
+  const col = (text: string, tone: Tone, look: Look) => paint(SGR[tone] + LOOK[look], center(text, 14));
+  const meters = pic.meters.map((meter) => col(meter.name, meter.tone, "still")).join("");
+  const values = pic.meters.map((meter) => col(meter.value, meter.tone, meter.look)).join("");
+  const rows = pic.rows.map((line) => line.map((cell) => paint(SGR[cell.tone] + LOOK[cell.look], cell.text)).join("  ")).join("\n");
+  const lines = [
+    paint(SGR.gold, "AUTUMN MOON"),
+    "",
+    meters.trimEnd(),
+    values.trimEnd(),
+    pic.spin ? paint(BAR.spin, pic.spin) : "",
+    rows,
+    "",
+    paint("37", pic.credits),
+    ...(pic.banner ? [paint(SGR[pic.bannerTone] + ";1", pic.banner)] : []),
+    paint("33", pic.feature),
+  ];
+  return `\x1b[H\x1b[J${lines.join("\n")}\n${paint(BAR[pic.bar], pic.status.padEnd(72))}\n`;
+}
+
+function esc(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+}
+
+function span(text: string, tone: Tone, look: Look): string {
+  return `<span class="${tone} ${look}">${esc(text)}</span>`;
+}
+
+/** The picture as colored text. The page paints the status bar itself. */
+export function markup(pic: Picture): string {
+  const col = (text: string, tone: Tone, look: Look) => span(center(text, 14), tone, look);
+  const meters = pic.meters.map((meter) => col(meter.name, meter.tone, "still")).join("");
+  const values = pic.meters.map((meter) => col(meter.value, meter.tone, meter.look)).join("");
+  const rows = pic.rows.map((line) => line.map((cell) => span(cell.text, cell.tone, cell.look)).join("  ")).join("\n");
+  const spin = pic.spin ? `<span class="spinbar">${esc(pic.spin)}</span>` : "";
+  const banner = pic.banner ? `${span(pic.banner, pic.bannerTone, "still")}\n` : "";
+  return `${span("AUTUMN MOON", "gold", "still")}\n\n${meters.trimEnd()}\n${values.trimEnd()}\n${spin}\n${rows}\n\n${span(pic.credits, "card", "still")}\n${banner}${span(pic.feature, "gold", "still")}`;
+}
