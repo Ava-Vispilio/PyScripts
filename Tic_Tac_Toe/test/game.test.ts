@@ -168,9 +168,17 @@ test("the cursor cell wears the mover's color", () => {
 
 test("the turn row names the mover in their color", () => {
   expect(plain(single(), newView())).toContain("Turn: You (X)");
+  expect(plain(single(), newView()).split("\n")).toContain("Turn: You (X)");
   expect(plain(stage("mid")!, newView())).toContain("Turn: CPU (O)");
   expect(plain(double(), newView())).toContain("Turn: Player 1 (X)");
   expect(plain(place(double(), 4), newView())).toContain("Turn: Player 2 (O)");
+});
+
+test("the board advertises the Esc reset, the mode screen does not", () => {
+  expect(plain(stage("mid")!, newView())).toContain("Press Esc to reset");
+  expect(plain(newGame(), newView())).not.toContain("Press Esc to reset");
+  expect(ansi(picture(stage("xwins")!, newView()))).toContain("\x1b[90mPress Esc to reset\x1b[0m");
+  expect(markup(picture(double(), newView()))).toContain('<span class="dim still">Press Esc to reset</span>');
 });
 
 test("the result rows name the winner", () => {

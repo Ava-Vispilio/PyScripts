@@ -33,6 +33,7 @@ export const WIDTH = 31;
 const TITLE = "TIC TAC TOE";
 const TIP_SELECT = "TIP: Arrows move, Enter chooses";
 const TIP_BOARD = "TIP: Arrows move, Enter places";
+const RESET = "Press Esc to reset";
 
 export const newView = (): View => ({ option: 0, cell: 4 });
 
@@ -138,9 +139,11 @@ export function plain(game: Game, view: View): string {
     "",
     ...pic.rows.map((line) => line.map((cell) => cell.text).join("  ")),
     "",
-    center(pic.turn.text, WIDTH),
+    pic.turn.text,
     "",
     pic.tip,
+    "",
+    RESET,
     "",
     bar,
   ].join("\n");
@@ -164,9 +167,11 @@ export function ansi(pic: Picture): string {
     lines.push(
       ...pic.rows.map((line) => line.map(ink).join("  ")),
       "",
-      paint(SGR[pic.turn.tone], center(pic.turn.text, WIDTH)),
+      paint(SGR[pic.turn.tone], pic.turn.text),
       "",
       paint(SGR.gold, pic.tip),
+      "",
+      paint(SGR.dim, RESET),
     );
   }
   return `\x1b[H\x1b[J${lines.join("\n")}\n${paint(BAR[pic.bar], center(pic.status, WIDTH))}\n`;
@@ -194,5 +199,5 @@ export function markup(pic: Picture): string {
       line.map((cell, c) => `<span class="cell" data-cell="${r * 3 + c}">${span(cell.text, cell.tone, cell.look)}</span>`).join("  "),
     )
     .join("\n");
-  return `${head}\n\n${rows}\n\n${span(center(pic.turn.text, WIDTH), pic.turn.tone, "still")}\n\n${span(pic.tip, "gold", "still")}`;
+  return `${head}\n\n${rows}\n\n${span(pic.turn.text, pic.turn.tone, "still")}\n\n${span(pic.tip, "gold", "still")}\n\n${span(RESET, "dim", "still")}`;
 }
