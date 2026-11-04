@@ -193,7 +193,7 @@ test("the result rows name the winner", () => {
   expect(plain(duel([0, 2, 5, 4, 7, 6]), newView())).toContain("CPU wins");
   expect(plain(stage("xwins")!, newView())).toContain("Player 1 (X) wins");
   expect(plain(stage("owins")!, newView())).toContain("Player 2 (O) wins");
-  expect(plain(stage("draw")!, newView())).toContain("It's a draw");
+  expect(plain(stage("draw")!, newView())).toContain("It's a draw!");
 });
 
 test("the bar tracks the phase", () => {

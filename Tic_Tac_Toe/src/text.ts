@@ -71,7 +71,7 @@ function turnPiece(game: Game): Piece {
         : `Player ${phase.player === "X" ? "1" : "2"} (${phase.player}) wins`;
     return { text, tone: toneOf(phase.player), look: "still" };
   }
-  return { text: "It's a draw", tone: "dim", look: "still" };
+  return { text: "It's a draw!", tone: "dim", look: "still" };
 }
 
 function statusOf(game: Game): string {
