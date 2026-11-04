@@ -74,6 +74,7 @@ function box(label: string): string {
 
 const BOARD = 53;
 const WIDTHS = [13, 12, 13, 12];
+const RESET = "Press Esc to reset";
 
 /** How long one spinning frame stays up. Orb faces turn a little slower than the reels. */
 export const REEL_PACE = 36;
@@ -147,7 +148,7 @@ export function plain(play: Play): string {
   const head = spread(names);
   const values = [meter(1000), meter(5000), meter(play.major), meter(play.grand)].map((amount, i) => under(names[i] ?? "", amount, WIDTHS[i] ?? 12)).join(" ");
   const rows = play.rows.map((row) => row.map(box).join("  ")).join("\n");
-  return ["AUTUMN MOON", "", head, values, "", rows, "", creditLine(play), play.feature, play.status].join("\n");
+  return ["AUTUMN MOON", "", head, values, "", rows, "", creditLine(play), play.feature, RESET, play.status].join("\n");
 }
 
 function callout(play: Play): { banner: string; bannerTone: Tone } {
@@ -310,7 +311,7 @@ export function ansi(pic: Picture): string {
   const ink = (cell: Cell) => (cell.look === "win" ? "30;107" : SGR[cell.tone] + LOOK[cell.look]);
   const rows = pic.rows.map((line) => line.map((cell) => paint(ink(cell), cell.text)).join("  ")).join("\n");
   const above = pic.spin ? paint(BAR[pic.bar], center(pic.spin.trim(), BOARD)) : "";
-  const lines = [paint(SGR.gold, "AUTUMN MOON"), "", meters, values, above, rows, "", paint("37", pic.credits), paint("33", pic.feature)];
+  const lines = [paint(SGR.gold, "AUTUMN MOON"), "", meters, values, above, rows, "", paint("37", pic.credits), paint("33", pic.feature), paint(SGR.dim, RESET)];
   return `\x1b[H\x1b[J${lines.join("\n")}\n${paint(BAR[pic.bar], center(pic.status, BOARD))}\n`;
 }
 
@@ -331,5 +332,5 @@ export function markup(pic: Picture): string {
   const rows = pic.rows.map((line) => line.map((cell) => (cell.look === "win" ? `<span class="hit">${esc(cell.text)}</span>` : span(cell.text, cell.tone, cell.look))).join("  ")).join("\n");
   const label = pic.spin.trim();
   const spin = label ? `<span class="banner ${pic.bar}">${esc(center(label, BOARD))}</span>` : "";
-  return `${span("AUTUMN MOON", "gold", "still")}\n\n${meters}\n${values}\n${spin}\n${rows}\n\n${span(pic.credits, "card", "still")}\n${span(pic.feature, "gold", "still")}`;
+  return `${span("AUTUMN MOON", "gold", "still")}\n\n${meters}\n${values}\n${spin}\n${rows}\n\n${span(pic.credits, "card", "still")}\n${span(pic.feature, "gold", "still")}\n${span(RESET, "dim", "still")}`;
 }

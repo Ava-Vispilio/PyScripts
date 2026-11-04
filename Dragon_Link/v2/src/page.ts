@@ -15,6 +15,7 @@ let play: Play = opened();
 let busy = false;
 let down = false;
 let shownCoin = -1;
+let run = 0;
 const chance = live(seeded(1));
 
 function opened(): Play {
@@ -42,11 +43,14 @@ function seeded(seed: number): () => number {
 
 async function playSpin(next: Play) {
   busy = true;
+  const mine = run;
   const list = coast(play, next, 0);
   for (let i = 0; i < list.length; i++) {
+    if (run !== mine) return;
     draw(list[i]!, next.coin);
     if (i < list.length - 1) await new Promise((resolve) => setTimeout(resolve, list[i]!.wait));
   }
+  if (run !== mine) return;
   play = next;
   busy = false;
 }
@@ -65,6 +69,15 @@ function press(key: "spin" | "coinUp" | "coinDown") {
 draw(picture(play), play.coin);
 
 document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    run++;
+    play = newPlay();
+    busy = false;
+    down = false;
+    draw(picture(play), play.coin);
+    return;
+  }
   const key = event.key === "Enter" || event.key === " " ? "spin" : event.key === "ArrowRight" ? "coinUp" : event.key === "ArrowLeft" ? "coinDown" : null;
   if (!key || event.repeat) return;
   event.preventDefault();

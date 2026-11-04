@@ -3,10 +3,11 @@ import { ansi, coast, picture } from "./text";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const keyOf = (key: string): "spin" | "coinUp" | "coinDown" | "quit" | null => {
+const keyOf = (key: string): "spin" | "coinUp" | "coinDown" | "reset" | "quit" | null => {
   if (key === "\r" || key === "\n" || key === " ") return "spin";
   if (key === "\x1b[C" || key === "+" || key === "=") return "coinUp";
   if (key === "\x1b[D" || key === "-" || key === "_") return "coinDown";
+  if (key === "\x1b") return "reset";
   if (key === "q" || key === "Q" || key === "\x03") return "quit";
   return null;
 };
@@ -19,6 +20,7 @@ if (import.meta.main) {
   let coasting = false;
   let ready = true;
   let lastSpin = 0;
+  let run = 0;
   const chance = live();
   const paint = (pic: ReturnType<typeof picture>) => process.stdout.write(ansi(pic));
   paint(picture(play));
@@ -26,13 +28,16 @@ if (import.meta.main) {
   async function playSpin() {
     ready = false;
     coasting = true;
+    const mine = run;
     const before = play;
     const landed = act(before, "spin", chance);
     const list = coast(before, landed, 0);
     for (let i = 0; i < list.length; i++) {
+      if (run !== mine) return;
       paint(list[i]!);
       if (i < list.length - 1) await sleep(list[i]!.wait);
     }
+    if (run !== mine) return;
     play = landed;
     coasting = false;
   }
@@ -46,6 +51,14 @@ if (import.meta.main) {
     if (key === "quit") {
       stdin.setRawMode(false);
       process.exit(0);
+    }
+    if (key === "reset") {
+      run++;
+      play = newPlay();
+      coasting = false;
+      ready = true;
+      paint(picture(play));
+      return;
     }
     if (key === "coinUp" || key === "coinDown") {
       if (coasting || !ready) return;

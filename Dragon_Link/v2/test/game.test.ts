@@ -20,8 +20,9 @@ test("the screen is the terminal text", () => {
   const miniMid = lines[2]!.indexOf("MINI") + 1.5;
   const numMid = lines[3]!.indexOf("1,000") + 2;
   expect(numMid).toBeLessThanOrEqual(miniMid);
-  expect(lines.at(-2)!.startsWith("TIP:")).toBe(true);
-  expect(lines.at(-2)!.length).toBeLessThanOrEqual(53);
+  expect(lines.at(-3)!.startsWith("TIP:")).toBe(true);
+  expect(lines.at(-3)!.length).toBeLessThanOrEqual(53);
+  expect(lines.at(-2)).toBe("Press Esc to reset");
   expect(text).toContain("[ DRGN  ]  [ MOON  ]  [  ORB  ]  [ LOTUS ]  [  FAN  ]");
   expect(text).toContain("Credits: 50,000     Bet: 50     Win: 0");
   expect(text.endsWith("Press Enter to spin")).toBe(true);
@@ -49,7 +50,7 @@ test("five moons pay 250 times the bet and start six free games", () => {
   expect(play.credits).toBe(50_000 - 50 + 250 * 50);
   expect(play.phase).toEqual({ kind: "free", left: 6 });
   expect(plain(play)).toContain("TIP: Doors open onto one symbol, 6 free games left");
-  expect(plain(play).split("\n").at(-2)!.length).toBeLessThanOrEqual(53);
+  expect(plain(play).split("\n").at(-3)!.length).toBeLessThanOrEqual(53);
   expect(markup(picture(play))).toContain('class="banner free"');
 });
 
@@ -74,7 +75,7 @@ test("a new orb resets the respin count and fifteen orbs pay Grand", () => {
   play = act(play, "spin", scripted({ faces }));
   expect(play.phase).toMatchObject({ kind: "hold", respins: 3 });
   expect(play.status).toBe("Press Enter for hold-and-spin respin 3");
-  expect(plain(play).split("\n").at(-2)).toBe("TIP: A new ORB resets the respins to 3");
+  expect(plain(play).split("\n").at(-3)).toBe("TIP: A new ORB resets the respins to 3");
   expect(markup(picture(play))).toContain('class="banner hold"');
   play = act(play, "spin", scripted({ locks: [[true, false, false, false, false, false, false, false, false]], faces: [face("100", 100)] }));
   expect(play.phase).toMatchObject({ kind: "hold", respins: 3 });
