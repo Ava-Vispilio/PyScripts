@@ -12,8 +12,10 @@ const face = (label: string, pay: number): Face => ({ label, pay });
 
 test("the screen is the terminal text", () => {
   const text = plain(newPlay());
-  expect(text.startsWith("AUTUMN MOON\n")).toBe(true);
   const lines = text.split("\n");
+  expect(lines[0]!.trim()).toBe("AUTUMN MOON");
+  expect(lines[0]!.startsWith(" ")).toBe(true);
+  expect(lines[0]).toHaveLength(53);
   expect(lines[2]).toHaveLength(53);
   expect(lines[3]).toHaveLength(53);
   expect(lines[5]).toHaveLength(53);
