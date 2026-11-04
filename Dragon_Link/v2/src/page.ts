@@ -69,7 +69,8 @@ function press(key: "spin" | "coinUp" | "coinDown") {
 draw(picture(play), play.coin);
 
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") {
+  const reset = event.key === "Escape" || ((event.key === "r" || event.key === "R") && !event.metaKey && !event.ctrlKey && !event.altKey);
+  if (reset) {
     event.preventDefault();
     run++;
     play = newPlay();

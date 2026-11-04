@@ -7,7 +7,7 @@ const keyOf = (key: string): "spin" | "coinUp" | "coinDown" | "reset" | "quit" |
   if (key === "\r" || key === "\n" || key === " ") return "spin";
   if (key === "\x1b[C" || key === "+" || key === "=") return "coinUp";
   if (key === "\x1b[D" || key === "-" || key === "_") return "coinDown";
-  if (key === "\x1b") return "reset";
+  if (key === "\x1b" || key === "r" || key === "R") return "reset";
   if (key === "q" || key === "Q" || key === "\x03") return "quit";
   return null;
 };
