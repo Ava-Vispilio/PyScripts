@@ -1,6 +1,6 @@
 import { awaitingReply, newGame, nudgeCell, nudgeOption, stage, step, type Action, type Dir, type Game } from "./game";
 import { bestCell } from "./ai";
-import { markup, newView, picture } from "./text";
+import { markup, newView, picture, BACK } from "./text";
 
 function need(id: string): HTMLElement {
   const el = document.querySelector(id);
@@ -10,6 +10,7 @@ function need(id: string): HTMLElement {
 
 const board = need("#screen");
 const bar = need("#status");
+const back = need("#back");
 
 let game = opened();
 let view = newView();
@@ -28,6 +29,8 @@ function draw() {
   board.innerHTML = markup(pic);
   bar.textContent = pic.status;
   bar.className = pic.bar;
+  back.textContent = pic.screen === "board" ? BACK : "";
+  back.hidden = pic.screen !== "board";
 }
 
 function think() {

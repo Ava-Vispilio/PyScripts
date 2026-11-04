@@ -33,7 +33,9 @@ export const WIDTH = 31;
 const TITLE = "TIC TAC TOE";
 const TIP_SELECT = "TIP: Arrows move, Enter chooses";
 const TIP_BOARD = "TIP: Arrows move, Enter places";
-const RESET = "Press Esc to reset";
+
+/** The go-back hint sits under the status bar on board screens. The page paints it itself, like the bar. */
+export const BACK = "Press Esc to go back";
 
 export const newView = (): View => ({ option: 0, cell: 4 });
 
@@ -143,9 +145,8 @@ export function plain(game: Game, view: View): string {
     "",
     pic.tip,
     "",
-    RESET,
-    "",
     bar,
+    BACK,
   ].join("\n");
 }
 
@@ -171,10 +172,10 @@ export function ansi(pic: Picture): string {
       "",
       paint(SGR.gold, pic.tip),
       "",
-      paint(SGR.dim, RESET),
     );
   }
-  return `\x1b[H\x1b[J${lines.join("\n")}\n${paint(BAR[pic.bar], center(pic.status, WIDTH))}\n`;
+  const hint = pic.screen === "board" ? `\n${paint(SGR.dim, BACK)}` : "";
+  return `\x1b[H\x1b[J${lines.join("\n")}\n${paint(BAR[pic.bar], center(pic.status, WIDTH))}${hint}\n`;
 }
 
 function esc(text: string): string {
@@ -199,5 +200,5 @@ export function markup(pic: Picture): string {
       line.map((cell, c) => `<span class="cell" data-cell="${r * 3 + c}">${span(cell.text, cell.tone, cell.look)}</span>`).join("  "),
     )
     .join("\n");
-  return `${head}\n\n${rows}\n\n${span(pic.turn.text, pic.turn.tone, "still")}\n\n${span(pic.tip, "gold", "still")}\n\n${span(RESET, "dim", "still")}`;
+  return `${head}\n\n${rows}\n\n${span(pic.turn.text, pic.turn.tone, "still")}\n\n${span(pic.tip, "gold", "still")}`;
 }

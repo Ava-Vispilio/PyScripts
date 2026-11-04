@@ -174,11 +174,16 @@ test("the turn row names the mover in their color", () => {
   expect(plain(place(double(), 4), newView())).toContain("Turn: Player 2 (O)");
 });
 
-test("the board advertises the Esc reset, the mode screen does not", () => {
-  expect(plain(stage("mid")!, newView())).toContain("Press Esc to reset");
-  expect(plain(newGame(), newView())).not.toContain("Press Esc to reset");
-  expect(ansi(picture(stage("xwins")!, newView()))).toContain("\x1b[90mPress Esc to reset\x1b[0m");
-  expect(markup(picture(double(), newView()))).toContain('<span class="dim still">Press Esc to reset</span>');
+test("the board advertises going back under the bar, the mode screen does not", () => {
+  const text = plain(stage("mid")!, newView()).split("\n");
+  expect(text).toContain("Press Esc to go back");
+  expect(text.at(-1)).toBe("Press Esc to go back");
+  expect(text.at(-2)).toBe("          In progress          ");
+  expect(plain(newGame(), newView())).not.toContain("Press Esc to go back");
+  const screen = ansi(picture(stage("xwins")!, newView()));
+  expect(screen.endsWith("\x1b[90mPress Esc to go back\x1b[0m\n")).toBe(true);
+  expect(screen).toContain("\x1b[42;97m  Press Enter to reset board   \x1b[0m\n\x1b[90mPress Esc to go back");
+  expect(markup(picture(double(), newView()))).not.toContain("Press Esc to go back");
 });
 
 test("the result rows name the winner", () => {
@@ -197,8 +202,8 @@ test("the bar tracks the phase", () => {
   expect(picture(stage("xwins")!, newView()).bar).toBe("win");
   expect(picture(stage("owins")!, newView()).bar).toBe("lose");
   expect(picture(stage("draw")!, newView()).bar).toBe("draw");
-  expect(plain(double(), newView()).split("\n").at(-1)).toBe("          In progress          ");
-  expect(plain(stage("xwins")!, newView()).split("\n").at(-1)).toBe("  Press Enter to reset board   ");
+  expect(plain(double(), newView()).split("\n").at(-2)).toBe("          In progress          ");
+  expect(plain(stage("xwins")!, newView()).split("\n").at(-2)).toBe("  Press Enter to reset board   ");
 });
 
 test("the winning line lights up in the winner's color", () => {
@@ -210,9 +215,9 @@ test("the winning line lights up in the winner's color", () => {
   expect(web).toContain('<span class="cell" data-cell="4"><span class="o still">[   O   ]</span>');
 });
 
-test("ansi clears the screen and paints the bar last", () => {
+test("ansi clears the screen and paints the hint under the bar", () => {
   const text = ansi(picture(stage("xwins")!, newView()));
   expect(text.startsWith("\x1b[H\x1b[J")).toBe(true);
-  expect(text.endsWith("\x1b[42;97m  Press Enter to reset board   \x1b[0m\n")).toBe(true);
+  expect(text.endsWith("\x1b[42;97m  Press Enter to reset board   \x1b[0m\n\x1b[90mPress Esc to go back\x1b[0m\n")).toBe(true);
   expect(markup(picture(double(), newView()))).not.toContain("In progress");
 });
