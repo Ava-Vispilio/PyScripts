@@ -11,6 +11,7 @@ import {
   type Board,
   type Game,
 } from "../src/game";
+import { ansi, markup, newView, picture, plain, WIDTH } from "../src/text";
 
 const board = (text: string): Board => [...text].map((c) => (c === "X" || c === "O" ? c : null));
 const place = (game: Game, ...cells: number[]): Game =>
@@ -133,4 +134,77 @@ test("named stages land on the situations the page links to", () => {
   expect(stage("xwins")!.phase).toEqual({ kind: "win", player: "X", line: [0, 1, 2], vs: "human" });
   expect(stage("owins")!.phase).toEqual({ kind: "win", player: "O", line: [2, 4, 6], vs: "human" });
   expect(stage("draw")!.phase).toEqual({ kind: "draw", vs: "human" });
+});
+
+test("both screens fit the board width", () => {
+  for (const name of ["", "mid", "xwins", "owins", "draw"]) {
+    for (const line of plain(stage(name)!, newView()).split("\n")) {
+      expect(line.length).toBeLessThanOrEqual(WIDTH);
+    }
+  }
+  const boardText = plain(stage("mid")!, newView()).split("\n");
+  expect(boardText[2]).toHaveLength(WIDTH);
+  expect(boardText[3]).toHaveLength(WIDTH);
+  expect(boardText[4]).toHaveLength(WIDTH);
+  expect(boardText[2]).toBe("[   X   ]  [       ]  [   X   ]");
+  expect(boardText[3]).toBe("[       ]  [   O   ]  [       ]");
+});
+
+test("the mode screen offers both modes with the cursor on the first", () => {
+  const text = plain(newGame(), newView());
+  expect(text).toContain("[ ONE PLAYER ]");
+  expect(text).toContain("[ TWO PLAYERS ]");
+  expect(plain(newGame(), newView()).split("\n").at(-1)).toBe("         Choose a mode         ");
+  const web = markup(picture(newGame(), newView()));
+  expect(web).toContain('<span class="opt" data-option="0"><span class="card hot">');
+  expect(web).toContain('<span class="opt" data-option="1"><span class="card still">');
+});
+
+test("the cursor cell wears the mover's color", () => {
+  const web = markup(picture(stage("mid")!, { option: 0, cell: 1 }));
+  expect(web).toContain('<span class="cell" data-cell="1"><span class="o hot">[       ]</span>');
+  expect(web).toContain('<span class="cell" data-cell="0"><span class="x still">[   X   ]</span>');
+});
+
+test("the turn row names the mover in their color", () => {
+  expect(plain(single(), newView())).toContain("Turn: You (X)");
+  expect(plain(stage("mid")!, newView())).toContain("Turn: CPU (O)");
+  expect(plain(double(), newView())).toContain("Turn: Player 1 (X)");
+  expect(plain(place(double(), 4), newView())).toContain("Turn: Player 2 (O)");
+});
+
+test("the result rows name the winner", () => {
+  const duel = (moves: number[]): Game =>
+    moves.reduce((g, cell) => step(g, { type: turnOf(g.board) === "X" ? "place" : "reply", cell }), single());
+  expect(plain(duel([0, 4, 1, 8, 2]), newView())).toContain("You win");
+  expect(plain(duel([0, 2, 5, 4, 7, 6]), newView())).toContain("CPU wins");
+  expect(plain(stage("xwins")!, newView())).toContain("Player 1 (X) wins");
+  expect(plain(stage("owins")!, newView())).toContain("Player 2 (O) wins");
+  expect(plain(stage("draw")!, newView())).toContain("It's a draw");
+});
+
+test("the bar tracks the phase", () => {
+  expect(picture(newGame(), newView()).bar).toBe("select");
+  expect(picture(double(), newView()).bar).toBe("play");
+  expect(picture(stage("xwins")!, newView()).bar).toBe("win");
+  expect(picture(stage("owins")!, newView()).bar).toBe("lose");
+  expect(picture(stage("draw")!, newView()).bar).toBe("draw");
+  expect(plain(double(), newView()).split("\n").at(-1)).toBe("          In progress          ");
+  expect(plain(stage("xwins")!, newView()).split("\n").at(-1)).toBe("  Press Enter to reset board   ");
+});
+
+test("the winning line lights up in the winner's color", () => {
+  const web = markup(picture(stage("xwins")!, newView()));
+  expect(web).toContain('<span class="cell" data-cell="0"><span class="x hot">[   X   ]</span>');
+  expect(web).toContain('<span class="cell" data-cell="1"><span class="x hot">[   X   ]</span>');
+  expect(web).toContain('<span class="cell" data-cell="2"><span class="x hot">[   X   ]</span>');
+  expect(web).toContain('<span class="cell" data-cell="3"><span class="card still">[       ]</span>');
+  expect(web).toContain('<span class="cell" data-cell="4"><span class="o still">[   O   ]</span>');
+});
+
+test("ansi clears the screen and paints the bar last", () => {
+  const text = ansi(picture(stage("xwins")!, newView()));
+  expect(text.startsWith("\x1b[H\x1b[J")).toBe(true);
+  expect(text.endsWith("\x1b[42;97m  Press Enter to reset board   \x1b[0m\n")).toBe(true);
+  expect(markup(picture(double(), newView()))).not.toContain("In progress");
 });
