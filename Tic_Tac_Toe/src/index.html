@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Tic Tac Toe</title>
+    <style>
+      body { margin: 0; background: #000; color: #ddd; font: 16px/1.35 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+      main { width: 31ch; max-width: 100%; margin: 0 auto; padding: 1.5rem 0 3rem; }
+      pre { margin: 0; white-space: pre; }
+      .x { color: #56d4dd; }
+      .o { color: #ff9d2e; }
+      .card { color: #e8e8e8; }
+      .dim { color: #888; }
+      .gold { color: #f5b942; }
+      .x.hot { background: #56d4dd; color: #111; }
+      .o.hot { background: #ff9d2e; color: #111; }
+      .card.hot { background: #e8e8e8; color: #111; }
+      #status { width: 31ch; max-width: 100%; box-sizing: border-box; color: #fff; padding: 0.15rem 0.4rem; text-align: center; }
+      #status.select, #status.draw { background: #444; color: #ddd; }
+      #status.play { background: #ca8a00; color: #111; }
+      #status.win { background: #1f7a3a; }
+      #status.lose { background: #b00000; }
+      .opt, .cell { cursor: pointer; }
+      p { color: #888; font-size: 0.85rem; }
+      article { color: #ccc; margin-top: 2rem; line-height: 1.55; font-size: 0.9rem; border-top: 1px solid #333; }
+      article h2 { color: #f5b942; font-size: 1rem; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <pre id="screen"></pre>
+      <div id="status"></div>
+      <p>Arrows move, Enter or Space places, R restarts, Esc picks the mode again</p>
+      <article>
+        <h2>How to play</h2>
+        <p>Two players take turns marking a square of a 3x3 grid. X always goes first. The first to line up three of their marks in a row, a column, or a diagonal wins. If all nine squares fill with no line, the game is a draw.</p>
+        <h2>Origins</h2>
+        <p>Games of this shape go back millennia: Romans played Terni Lapilli, and variant boards are carved into ancient roofs and floors. The modern pen and paper form spread in the 1800s as noughts and crosses in Britain and tic-tac-toe in America. In 1952 the EDSAC computer at Cambridge ran OXO, one of the first computer games ever made, and it played exactly this game against a human opponent.</p>
+      </article>
+    </main>
+    <script src="./main.js" defer></script>
+  </body>
+</html>
