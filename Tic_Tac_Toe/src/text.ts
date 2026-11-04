@@ -31,11 +31,11 @@ export type Picture = SelectPicture | BoardPicture;
 
 export const WIDTH = 31;
 const TITLE = "TIC TAC TOE";
-const TIP_SELECT = "TIP: Arrows move, Enter chooses";
-const TIP_BOARD = "TIP: Arrows move, Enter places";
+const TIP_SELECT = "Arrows = Move, Enter = Choose";
+const TIP_BOARD = "Arrows = Move, Enter = Place";
 
 /** The go-back hint sits under the status bar on board screens. The page paints it itself, like the bar. */
-export const BACK = "Press Esc to go back";
+export const BACK = "Esc = Back, R = Reset";
 
 export const newView = (): View => ({ option: 0, cell: 4 });
 

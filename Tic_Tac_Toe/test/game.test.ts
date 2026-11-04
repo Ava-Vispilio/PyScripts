@@ -176,14 +176,14 @@ test("the turn row names the mover in their color", () => {
 
 test("the board advertises going back under the bar, the mode screen does not", () => {
   const text = plain(stage("mid")!, newView()).split("\n");
-  expect(text).toContain("Press Esc to go back");
-  expect(text.at(-1)).toBe("Press Esc to go back");
+  expect(text).toContain("Esc = Back, R = Reset");
+  expect(text.at(-1)).toBe("Esc = Back, R = Reset");
   expect(text.at(-2)).toBe("          In progress          ");
-  expect(plain(newGame(), newView())).not.toContain("Press Esc to go back");
+  expect(plain(newGame(), newView())).not.toContain("Esc = Back, R = Reset");
   const screen = ansi(picture(stage("xwins")!, newView()));
-  expect(screen.endsWith("\x1b[90mPress Esc to go back\x1b[0m\n")).toBe(true);
-  expect(screen).toContain("\x1b[42;97m  Press Enter to reset board   \x1b[0m\n\x1b[90mPress Esc to go back");
-  expect(markup(picture(double(), newView()))).not.toContain("Press Esc to go back");
+  expect(screen.endsWith("\x1b[90mEsc = Back, R = Reset\x1b[0m\n")).toBe(true);
+  expect(screen).toContain("\x1b[42;97m  Press Enter to reset board   \x1b[0m\n\x1b[90mEsc = Back, R = Reset");
+  expect(markup(picture(double(), newView()))).not.toContain("Esc = Back, R = Reset");
 });
 
 test("the result rows name the winner", () => {
@@ -218,6 +218,6 @@ test("the winning line lights up in the winner's color", () => {
 test("ansi clears the screen and paints the hint under the bar", () => {
   const text = ansi(picture(stage("xwins")!, newView()));
   expect(text.startsWith("\x1b[H\x1b[J")).toBe(true);
-  expect(text.endsWith("\x1b[42;97m  Press Enter to reset board   \x1b[0m\n\x1b[90mPress Esc to go back\x1b[0m\n")).toBe(true);
+  expect(text.endsWith("\x1b[42;97m  Press Enter to reset board   \x1b[0m\n\x1b[90mEsc = Back, R = Reset\x1b[0m\n")).toBe(true);
   expect(markup(picture(double(), newView()))).not.toContain("In progress");
 });

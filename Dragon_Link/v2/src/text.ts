@@ -74,7 +74,7 @@ function box(label: string): string {
 
 const BOARD = 53;
 const WIDTHS = [13, 12, 13, 12];
-const RESET = "Press Esc to reset";
+const RESET = "Esc or R = Reset";
 
 /** How long one spinning frame stays up. Orb faces turn a little slower than the reels. */
 export const REEL_PACE = 36;

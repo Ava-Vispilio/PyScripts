@@ -24,7 +24,7 @@ test("the screen is the terminal text", () => {
   expect(numMid).toBeLessThanOrEqual(miniMid);
   expect(lines.at(-3)!.startsWith("TIP:")).toBe(true);
   expect(lines.at(-3)!.length).toBeLessThanOrEqual(53);
-  expect(lines.at(-2)).toBe("Press Esc to reset");
+  expect(lines.at(-2)).toBe("Esc or R = Reset");
   expect(text).toContain("[ DRGN  ]  [ MOON  ]  [  ORB  ]  [ LOTUS ]  [  FAN  ]");
   expect(text).toContain("Credits: 50,000     Bet: 50     Win: 0");
   expect(text.endsWith("Press Enter to spin")).toBe(true);
