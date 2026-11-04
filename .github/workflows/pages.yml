@@ -1,0 +1,68 @@
+name: Publish the games to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble the site from each game's bundle
+        run: |
+          mkdir -p site/Tic_Tac_Toe site/Dragon_Link/v1 site/Dragon_Link/v2
+          cp -r Tic_Tac_Toe/docs/. site/Tic_Tac_Toe/
+          cp -r Dragon_Link/v1/docs/. site/Dragon_Link/v1/
+          cp -r Dragon_Link/v2/docs/. site/Dragon_Link/v2/
+          cat > site/index.html <<'HTML'
+          <!doctype html>
+          <html lang="en">
+            <head>
+              <meta charset="utf-8" />
+              <title>PyScripts games</title>
+              <style>
+                body { margin: 0; background: #000; color: #ddd; font: 16px/1.35 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+                main { width: 31ch; max-width: 100%; margin: 0 auto; padding: 1.5rem 0 3rem; }
+                h1 { color: #f5b942; font-size: 1rem; text-align: center; }
+                ul { list-style: none; padding: 0; }
+                li { margin: 0.75rem 0; text-align: center; }
+                a { color: #56d4dd; }
+                p { color: #888; font-size: 0.85rem; text-align: center; }
+              </style>
+            </head>
+            <body>
+              <main>
+                <h1>PYSCRIPTS GAMES</h1>
+                <ul>
+                  <li><a href="Tic_Tac_Toe/">Tic Tac Toe</a></li>
+                  <li><a href="Dragon_Link/v1/">Dragon Link v1</a></li>
+                  <li><a href="Dragon_Link/v2/">Dragon Link v2</a></li>
+                </ul>
+                <p>Each game runs here in the browser and ships as a terminal binary in its folder.</p>
+              </main>
+            </body>
+          </html>
+          HTML
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
