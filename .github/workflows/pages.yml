@@ -21,10 +21,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Assemble the site from each game's bundle
         run: |
-          mkdir -p site/Tic_Tac_Toe site/Dragon_Link/v1 site/Dragon_Link/v2
+          mkdir -p site/Tic_Tac_Toe site/Dragon_Link/v1 site/Dragon_Link/v2 site/Loop_Song
           cp -r Tic_Tac_Toe/docs/. site/Tic_Tac_Toe/
           cp -r Dragon_Link/v1/docs/. site/Dragon_Link/v1/
           cp -r Dragon_Link/v2/docs/. site/Dragon_Link/v2/
+          cp -r Loop_Song/docs/. site/Loop_Song/
           cat > site/index.html <<'HTML'
           <!doctype html>
           <html lang="en">
@@ -46,6 +47,7 @@ jobs:
                 <h1>PYSCRIPTS GAMES</h1>
                 <ul>
                   <li><a href="Tic_Tac_Toe/">Tic Tac Toe</a></li>
+                  <li><a href="Loop_Song/">Loop Song</a></li>
                   <li><a href="Dragon_Link/v1/">Dragon Link v1</a></li>
                   <li><a href="Dragon_Link/v2/">Dragon Link v2</a></li>
                 </ul>
