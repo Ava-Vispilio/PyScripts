@@ -15,7 +15,7 @@ type Player = {
   setPlaybackRate(rate: number): void;
 };
 
-type YT = { new (el: HTMLElement | string, options: Record<string, unknown>): Player };
+type YT = { Player: new (el: HTMLElement | string, options: Record<string, unknown>) => Player };
 
 function need(id: string): HTMLElement {
   const el = document.querySelector(id);
@@ -29,6 +29,7 @@ const back = need("#back");
 
 let game = opened();
 let player: Player | null = null;
+let playerReady = false;
 let apiReady = false;
 let loadedId: string | null = null;
 let lastSpeed = 1;
@@ -54,6 +55,7 @@ function draw() {
 
 function act(action: Action) {
   game = step(game, action);
+  if (action.type === "restart" && player && playerReady) player.pauseVideo();
   draw();
   syncPlayer();
 }
@@ -64,7 +66,7 @@ function syncPlayer() {
   const yt = (window as unknown as { YT?: YT }).YT;
   if (!yt) return;
   if (!player) {
-    player = new yt("player", {
+    player = new yt.Player("player", {
       videoId: game.videoId,
       playerVars: {
         playsinline: 1,
@@ -72,15 +74,17 @@ function syncPlayer() {
       },
       events: {
         onReady: () => {
+          // The widget API attaches its methods only once the iframe has
+          // shaken hands, so nothing may touch the player before this fires.
+          playerReady = true;
           applySettings();
-          const title = player!.getVideoData().title;
-          if (title) act({ type: "titled", title });
         },
       },
     });
     loadedId = game.videoId;
     return;
   }
+  if (!playerReady) return;
   if (game.videoId !== loadedId) {
     loadedId = game.videoId;
     player.loadVideoById(game.videoId);
@@ -120,7 +124,7 @@ function drawLoop(t: number, d: number) {
 
 /** Seek back at the loop edge; the engine stays pure and knows nothing of time. */
 setInterval(() => {
-  if (!player || game.load !== "loaded") return;
+  if (!player || !playerReady || game.load !== "loaded") return;
   const t = player.getCurrentTime();
   const d = player.getDuration();
   if (game.mode === "snippet" && game.window) {
@@ -129,12 +133,16 @@ setInterval(() => {
     player.seekTo(0, true);
   }
   drawLoop(t, d);
+  // getVideoData runs empty at first, so the real name arrives here once
+  // the embed has it — and again after a switch to another video.
+  const title = player.getVideoData().title;
+  if (title && title !== game.title) act({ type: "titled", title });
 }, 250);
 
 function play() {
   if (game.load !== "loaded") return;
   act({ type: "arm" });
-  if (player) {
+  if (player && playerReady) {
     if (player.getPlayerState() === 1) player.pauseVideo();
     else player.playVideo();
   }
