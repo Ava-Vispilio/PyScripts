@@ -7,7 +7,9 @@
       body { margin: 0; background: #000; color: #ddd; font: 16px/1.35 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
       main { width: 39ch; max-width: 100%; margin: 0 auto; padding: 1.5rem 0 3rem; }
       pre { margin: 0; white-space: pre; }
-      #player { width: 39ch; max-width: 100%; height: 220px; background: #000; margin-bottom: 1rem; }
+      /* 200x200 is YouTube's documented player minimum; smaller risks silent playback failure. */
+      #player-note { text-align: center; margin-bottom: 0.35rem; }
+      #player { display: block; width: 200px; max-width: 100%; height: 200px; background: #000; margin: 0 auto 1rem; }
       .url { color: #56d4dd; }
       .time { color: #ff9d2e; }
       .gold { color: #f5b942; }
@@ -29,6 +31,7 @@
   </head>
   <body>
     <main>
+      <div id="player-note" class="dim">(IFrame, because TOS)</div>
       <div id="player"></div>
       <pre id="screen"></pre>
       <div id="status"></div>
