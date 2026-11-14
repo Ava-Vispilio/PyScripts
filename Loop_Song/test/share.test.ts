@@ -11,7 +11,7 @@ test("decode round-trips what encode wrote", () => {
   for (const name of ["loaded", "snippet"]) {
     const game = stage(name)!;
     const parts = decode("#" + encode(game))!;
-    expect(parts.videoId).toBe(game.videoId);
+    expect(parts.videoId).toBe(game.videoId!);
     expect(parts.window).toEqual(game.window);
     expect(parts.speed).toBe(game.speed);
     expect(parts.mode).toBe(game.mode);

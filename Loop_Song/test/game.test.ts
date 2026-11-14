@@ -163,7 +163,7 @@ describe("speed and mode", () => {
     expect(nudgeSpeed(0.25, -1)).toBe(0.25);
     expect(nudgeSpeed(1, 1)).toBe(1.25);
     expect(nudgeSpeed(1, -1)).toBe(0.75);
-    expect(SPEEDS).toContain(nudgeSpeed(3.7, 1));
+    expect(SPEEDS as readonly number[]).toContain(nudgeSpeed(3.7, 1));
   });
 
   test("snippet mode refuses without a confirmed window", () => {

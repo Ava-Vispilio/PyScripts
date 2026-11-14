@@ -43,6 +43,9 @@ export type Action =
 
 export const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2] as const;
 
+/** Arrow directions as the shells see them, before they map to the field ring. */
+export type Dir = "up" | "down" | "left" | "right";
+
 const PRINTABLE = /^[\x20-\x7e]$/;
 const TIME = /^\d+(\.\d+)?$/;
 
