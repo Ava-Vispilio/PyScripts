@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { stage, step, type Game } from "../src/game";
-import { ansi, BACK, markup, plain, WIDTH } from "../src/text";
+import { ansi, backOf, markup, plain, WIDTH } from "../src/text";
 
 const STAGES = ["", "checking", "loaded", "snippet", "bad", "notfound", "badtimes"];
 const games = (): [string, Game][] => STAGES.map((name) => [name, stage(name)!]);
@@ -27,7 +27,12 @@ test("the empty form lays out as planned", () => {
   expect(lines[15]).toBe("[ Enter to confirm ]");
   expect(lines[17]).toBe("    P = Play, +/- = Speed, M = Mode    ");
   expect(lines[18]).toBe("              Type a link              ");
-  expect(lines[19]).toBe(BACK);
+  expect(lines[19]).toBe(backOf(stage("")!));
+});
+
+test("the reset hint follows the focused field", () => {
+  expect(backOf(stage("")!)).toBe("Esc = Reset, Ctrl-C = Quit");
+  expect(backOf(stage("snippet")!)).toBe("Esc or R = Reset, Q = Quit");
 });
 
 test("a loaded snippet fills the rows it owns and touches nothing else", () => {
@@ -62,7 +67,7 @@ test("the caret rides the focused field and only that field", () => {
 });
 
 test("a long draft keeps its tail and the video name keeps its head", () => {
-  let game = stage("loaded")!;
+  let game = step(stage("loaded")!, { type: "focus", field: "url" });
   for (let i = 0; i < 12; i++) game = step(game, { type: "backspace" });
   for (const ch of "0123456789012345678901234567890123456789") game = step(game, { type: "type", ch });
   const line = plain(game).split("\n")[3]!;
@@ -78,7 +83,7 @@ test("the ansi frame clears, colors the bar, and dims the hint", () => {
   const out = ansi(stage("snippet")!);
   expect(out.startsWith("\x1b[H\x1b[J")).toBe(true);
   expect(out).toContain("\x1b[42;97m");
-  expect(out.endsWith(`\x1b[90m${BACK}\x1b[0m\n`)).toBe(true);
+  expect(out.endsWith(`\x1b[90m${backOf(stage("snippet")!)}\x1b[0m\n`)).toBe(true);
   expect(out).toContain("\x1b[38;5;208;1m"); // the orange time fields
   expect(ansi(stage("bad")!)).toContain("\x1b[41;97m");
 });

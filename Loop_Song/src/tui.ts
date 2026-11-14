@@ -17,19 +17,24 @@ type Key =
   | { kind: "backspace" }
   | { kind: "char"; ch: string };
 
-function keyOf(press: string): Key | null {
+export function keyOf(press: string, focus: Game["focus"]): Key | null {
   const dir = ARROWS[press];
   if (dir) return { kind: "arrow", dir };
   if (press === "\r" || press === "\n") return { kind: "enter" };
+  if (press === "\x7f" || press === "\b") return { kind: "backspace" };
+  if (press === "\x1b") return { kind: "restart" };
+  if (press === "\x03") return { kind: "quit" };
+  // In the URL field every printable types — ids legally carry p, m, r, q and
+  // the speed signs — so the letter commands live only in the time fields,
+  // whose drafts take digits and a dot and nothing else.
+  if (focus === "url") return PRINTABLE.test(press) ? { kind: "char", ch: press } : null;
   if (press === "+" || press === "=") return { kind: "speed", dir: 1 };
   if (press === "-") return { kind: "speed", dir: -1 };
   if (press === "p" || press === "P") return { kind: "play" };
   if (press === "m" || press === "M") return { kind: "mode" };
-  if (press === "r" || press === "R" || press === "\x1b") return { kind: "restart" };
-  if (press === "q" || press === "Q" || press === "\x03") return { kind: "quit" };
-  if (press === "\x7f" || press === "\b") return { kind: "backspace" };
-  if (PRINTABLE.test(press)) return { kind: "char", ch: press };
-  return null;
+  if (press === "r" || press === "R") return { kind: "restart" };
+  if (press === "q" || press === "Q") return { kind: "quit" };
+  return PRINTABLE.test(press) ? { kind: "char", ch: press } : null;
 }
 
 /** The terminal hands us whatever arrived, so a fast arrow-plus-Enter is one chunk. */
@@ -122,7 +127,7 @@ if (import.meta.main) {
 
   stdin.on("data", (buf) => {
     for (const press of pressesOf(buf.toString("utf8"))) {
-      const key = keyOf(press);
+      const key = keyOf(press, game.focus);
       if (!key) continue;
       if (key.kind === "quit") {
         stdin.setRawMode(false);

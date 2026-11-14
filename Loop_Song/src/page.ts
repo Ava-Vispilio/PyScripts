@@ -1,6 +1,6 @@
 import { newGame, nudgeField, stage, step, type Action, type Dir, type Game } from "./game";
 import { decode, open } from "./share";
-import { BACK, markup, statusOf, barOf } from "./text";
+import { backOf, markup, statusOf, barOf } from "./text";
 
 /** The slice of the IFrame API the page uses, declared by hand: no dependency, no types package. */
 type Player = {
@@ -49,7 +49,7 @@ function draw() {
   board.innerHTML = markup(game);
   bar.textContent = statusOf(game);
   bar.className = barOf(game);
-  back.textContent = BACK;
+  back.textContent = backOf(game);
 }
 
 function act(action: Action) {
@@ -168,7 +168,21 @@ document.addEventListener("keydown", (event) => {
     act({ type: "backspace" });
     return;
   }
-  if (event.key === "Escape" || event.key === "r" || event.key === "R") {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    act({ type: "restart" });
+    return;
+  }
+  // The URL field types every printable; the letter commands live in the time
+  // fields, matching the terminal shell's key map.
+  if (game.focus === "url") {
+    if (event.key.length === 1) {
+      event.preventDefault();
+      act({ type: "type", ch: event.key });
+    }
+    return;
+  }
+  if (event.key === "r" || event.key === "R") {
     event.preventDefault();
     act({ type: "restart" });
     return;

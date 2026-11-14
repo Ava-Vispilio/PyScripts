@@ -32,8 +32,9 @@ export const WIDTH = 39;
 const TITLE = "LOOP SONG";
 const TIP = "P = Play, +/- = Speed, M = Mode";
 
-/** The reset hint sits under the status bar. The page paints it itself, like the bar. */
-export const BACK = "Esc or R = Reset, Q = Quit";
+/** The reset hint sits under the status bar, and follows the focused field: in the URL field every printable types, so reset and quit lose their letter keys there. */
+export const backOf = (game: Game): string =>
+  game.focus === "url" ? "Esc = Reset, Ctrl-C = Quit" : "Esc or R = Reset, Q = Quit";
 
 const SGR: Record<Tone, string> = {
   url: "96;1",
@@ -166,7 +167,7 @@ export function plain(game: Game): string {
     "",
     center(pic.tip.text, WIDTH),
     center(pic.status, WIDTH),
-    BACK,
+    backOf(game),
   ].join("\n");
 }
 
@@ -198,7 +199,7 @@ export function ansi(game: Game): string {
     "",
     paint(SGR.gold, center(pic.tip.text, WIDTH)),
   ];
-  return `\x1b[H\x1b[J${lines.join("\n")}\n${paint(BAR[pic.bar], center(pic.status, WIDTH))}\n${paint(SGR.dim, BACK)}\n`;
+  return `\x1b[H\x1b[J${lines.join("\n")}\n${paint(BAR[pic.bar], center(pic.status, WIDTH))}\n${paint(SGR.dim, backOf(game))}\n`;
 }
 
 function esc(text: string): string {

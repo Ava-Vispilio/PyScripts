@@ -125,7 +125,9 @@ function accept(game: Game): Game {
     const id = videoIdOf(game.url);
     const cleared = { videoId: id, title: null, window: null, snip: "empty" as Snip, mode: "full" as Mode, armed: false };
     if (!id) return { ...game, load: "badLink", ...cleared };
-    return { ...game, load: "checking", ...cleared };
+    // A good link hands the caret to the snippet fields, where the letter
+    // commands live: the URL field must let every printable through.
+    return { ...game, load: "checking", ...cleared, focus: "start" };
   }
   if (game.load !== "loaded") return game;
   const start = parseTime(game.start);

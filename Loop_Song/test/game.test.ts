@@ -39,6 +39,11 @@ describe("the load pipeline", () => {
     expect(step(newGame(), { type: "accept" })).toEqual(newGame());
   });
 
+  test("a good accept hands the caret to the snippet fields, a bad one keeps it", () => {
+    expect(load("https://youtu.be/dQw4w9WgXcQ").focus).toBe("start");
+    expect(step(typeAll(newGame(), "nope"), { type: "accept" }).focus).toBe("url");
+  });
+
   test("a parseable link enters checking with the old video cleared", () => {
     const game = load("https://youtu.be/dQw4w9WgXcQ");
     expect(game.load).toBe("checking");
