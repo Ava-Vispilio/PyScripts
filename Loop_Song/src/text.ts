@@ -1,11 +1,10 @@
-import type { Game } from "./game";
+import { timesSealed, type Game } from "./game";
 
 export type Tone = "url" | "time" | "gold" | "card" | "dim" | "good" | "bad";
 export type Look = "still" | "hot";
-export type Bar = "idle" | "checking" | "good" | "bad";
 export type Piece = { text: string; tone: Tone; look: Look };
 
-/** One settled screen. Fixed height: the same nineteen rows for every state. */
+/** One settled screen. Fixed height: the same eighteen rows for every state. */
 export type Picture = {
   title: Piece;
   urlLabel: Piece;
@@ -13,23 +12,21 @@ export type Picture = {
   loadButton: Piece;
   name: Piece;
   loop: Piece;
+  playChip: Piece;
+  speedChip: Piece;
+  modeChip: Piece;
   timesTitle: Piece;
   startLabel: Piece;
   startField: Piece;
   endLabel: Piece;
   endField: Piece;
   snipButton: Piece;
-  playChip: Piece;
-  speedChip: Piece;
-  modeChip: Piece;
   tip: Piece;
-  status: string;
-  bar: Bar;
 };
 
 export const WIDTH = 39;
 const TITLE = "LOOP SONG";
-const TIP = "↑↓ = Move, Enter = Select, Esc = Reset";
+const TIP = "↑↓ = Move, ←→ = Switch, Enter = Toggle";
 
 /** The reset hint is constant now: no letter commands remain to shadow. */
 export const backOf = "Esc = Reset, Ctrl-C = Quit";
@@ -52,7 +49,6 @@ const HOT: Record<Tone, string> = {
   good: "42;30",
   bad: "41;30",
 };
-const BAR: Record<Bar, string> = { idle: "43;30", checking: "43;30", good: "42;97", bad: "41;97" };
 
 function center(text: string, width: number): string {
   const pad = Math.max(0, width - text.length);
@@ -70,50 +66,38 @@ function head(text: string, max: number): string {
   return text.length <= max ? text : text.slice(0, max - 1) + "…";
 }
 
-export function statusOf(game: Game): string {
-  if (game.load === "badLink") return "Bad link";
-  if (game.load === "notFound") return "Not found";
-  if (game.load === "checking") return "Checking";
-  if (game.load === "idle") return "Type a link";
-  if (game.snip === "bad") return "Bad times";
-  if (game.window) return "Snippet set";
-  return "Loaded";
-}
-
-export function barOf(game: Game): Bar {
-  if (game.load === "badLink" || game.load === "notFound") return "bad";
-  if (game.load === "checking") return "checking";
-  if (game.load === "idle") return "idle";
-  if (game.snip === "bad") return "bad";
-  return "good";
-}
-
 function loadButton(game: Game, hot: boolean): Piece {
   const look: Look = hot ? "hot" : "still";
   if (game.load === "checking") return { text: "[ Checking ]", tone: "gold", look };
   if (game.load === "badLink") return { text: "[ Bad link ]", tone: "bad", look };
   if (game.load === "notFound") return { text: "[ Not found ]", tone: "bad", look };
   if (game.load === "loaded" && game.urlLocked)
-    return { text: "[ Enter to choose another song ]", tone: "card", look };
+    return { text: "[ Confirmed - Enter to Edit ]", tone: "good", look };
   return { text: "[ Enter to load ]", tone: "dim", look };
 }
 
 function snipButton(game: Game, hot: boolean): Piece {
   const look: Look = hot ? "hot" : "still";
+  if (timesSealed(game)) return { text: "[ Loop is FULL ]", tone: "dim", look };
   if (game.snip === "bad") return { text: "[ Bad times ]", tone: "bad", look };
-  if (game.snip === "set" && game.load === "loaded") return { text: "[ Enter to edit ]", tone: "good", look };
+  if (game.snip === "set" && game.load === "loaded")
+    return { text: "[ Confirmed - Enter to Edit ]", tone: "good", look };
   return { text: "[ Enter to confirm ]", tone: "dim", look };
 }
 
 function loopPiece(game: Game): Piece {
   if (game.load !== "loaded" && game.load !== "checking") return { text: "Loop: -", tone: "dim", look: "still" };
+  // The row says what is looping now: a kept window still shows in the dimmed
+  // fields, but the loop itself is the whole video until the mode says otherwise.
+  if (game.mode === "full") return { text: "Loop: Full video", tone: "card", look: "still" };
   if (!game.window) return { text: "Loop: Full video", tone: "card", look: "still" };
   const [s, e] = game.window;
   return { text: `Loop: ${s.toFixed(1)}s → ${e.toFixed(1)}s (${(e - s).toFixed(1)}s)`, tone: "card", look: "still" };
 }
 
-/** The time fields sit orange once a video is loaded, dim before that. */
-const timeTone = (game: Game): Tone => (game.load === "loaded" ? "time" : "dim");
+/** The time fields sit orange once a video is loaded, green while the pair is locked, dim when sealed away or unloaded. */
+const timeTone = (game: Game): Tone =>
+  timesSealed(game) || game.load !== "loaded" ? "dim" : game.snip === "set" ? "good" : "time";
 
 /** One settled screen, with a color and a highlight on every piece. */
 export function picture(game: Game): Picture {
@@ -132,24 +116,26 @@ export function picture(game: Game): Picture {
     loadButton: loadButton(game, game.focus === "url"),
     name: { text: head(game.title ?? "-", WIDTH), tone: game.title ? "card" : "dim", look: "still" },
     loop: loopPiece(game),
+    playChip: { text: game.armed ? "[ Pause ]" : "[ Play ]", tone: game.armed ? "good" : "card", look: focused("play") },
+    speedChip: { text: `[ ${game.speed.toFixed(2)}x ]`, tone: game.speed !== 1 ? "gold" : "card", look: focused("speed") },
+    modeChip: {
+      text: game.mode === "snippet" ? "[ Loop: SNIP ]" : "[ Loop: FULL ]",
+      tone: game.mode === "snippet" ? "gold" : "card",
+      look: focused("mode"),
+    },
     timesTitle: { text: "Start / End Timings", tone: "dim", look: "still" },
     startLabel: { text: "Start: ", tone: "dim", look: "still" },
     startField: { text: tail(game.start + caret("start"), WIDTH - 7), tone: timeTone(game), look: focused("start") },
     endLabel: { text: "End:   ", tone: "dim", look: "still" },
     endField: { text: tail(game.end + caret("end"), WIDTH - 7), tone: timeTone(game), look: focused("end") },
     snipButton: snipButton(game, inTimes),
-    playChip: { text: game.armed ? "[ Pause ]" : "[ Play ]", tone: "card", look: focused("play") },
-    speedChip: { text: `[ ${game.speed.toFixed(2)}x ]`, tone: "card", look: focused("speed") },
-    modeChip: { text: game.mode === "snippet" ? "[ Loop: SNIP ]" : "[ Loop: FULL ]", tone: "card", look: focused("mode") },
     tip: { text: TIP, tone: "gold", look: "still" },
-    status: statusOf(game),
-    bar: barOf(game),
   };
 }
 
 const chipsRow = (pic: Picture): string => `${pic.playChip.text}  ${pic.speedChip.text}  ${pic.modeChip.text}`;
 
-/** The screen as plain text. The last two lines are the status bar and the hint. */
+/** The screen as plain text. The last line is the hint. */
 export function plain(game: Game): string {
   const pic = picture(game);
   return [
@@ -162,15 +148,14 @@ export function plain(game: Game): string {
     pic.name.text,
     pic.loop.text,
     "",
+    center(chipsRow(pic), WIDTH),
+    "",
     pic.timesTitle.text,
     pic.startLabel.text + pic.startField.text,
     pic.endLabel.text + pic.endField.text,
     pic.snipButton.text,
     "",
-    center(chipsRow(pic), WIDTH),
-    "",
     center(pic.tip.text, WIDTH),
-    center(pic.status, WIDTH),
     backOf,
   ].join("\n");
 }
@@ -179,7 +164,7 @@ function paint(codes: string, text: string): string {
   return `\x1b[${codes}m${text}\x1b[0m`;
 }
 
-/** The picture as terminal color. The status bar takes its color from the load. */
+/** The picture as terminal color. Every piece carries its own state color. */
 export function ansi(game: Game): string {
   const pic = picture(game);
   const ink = (piece: Piece) => paint(piece.look === "hot" ? HOT[piece.tone] : SGR[piece.tone], piece.text);
@@ -193,16 +178,16 @@ export function ansi(game: Game): string {
     ink(pic.name),
     ink(pic.loop),
     "",
+    center(`${ink(pic.playChip)}  ${ink(pic.speedChip)}  ${ink(pic.modeChip)}`, WIDTH),
+    "",
     ink(pic.timesTitle),
     ink(pic.startLabel) + ink(pic.startField),
     ink(pic.endLabel) + ink(pic.endField),
     ink(pic.snipButton),
     "",
-    center(`${ink(pic.playChip)}  ${ink(pic.speedChip)}  ${ink(pic.modeChip)}`, WIDTH),
-    "",
     paint(SGR.gold, center(pic.tip.text, WIDTH)),
   ];
-  return `\x1b[H\x1b[J${lines.join("\n")}\n${paint(BAR[pic.bar], center(pic.status, WIDTH))}\n${paint(SGR.dim, backOf)}\n`;
+  return `\x1b[H\x1b[J${lines.join("\n")}\n${paint(SGR.dim, backOf)}\n`;
 }
 
 function esc(text: string): string {
@@ -222,7 +207,7 @@ function centerHtml(html: string, plainText: string, width: number): string {
   return " ".repeat(left) + html + " ".repeat(pad - left);
 }
 
-/** The picture as colored text. The page paints the status bar and the hint itself. */
+/** The picture as colored text. */
 export function markup(game: Game): string {
   const pic = picture(game);
   const ink = (piece: Piece) => span(piece.text, piece.tone, piece.look);
@@ -241,12 +226,12 @@ export function markup(game: Game): string {
     ink(pic.name),
     `<span class="loop" data-loop>${ink(pic.loop)}</span>`,
     "",
+    chips,
+    "",
     ink(pic.timesTitle),
     ink(pic.startLabel) + wrap('data-field="start"', ink(pic.startField)),
     ink(pic.endLabel) + wrap('data-field="end"', ink(pic.endField)),
     wrap("data-snip", ink(pic.snipButton)),
-    "",
-    chips,
     "",
     span(center(pic.tip.text, WIDTH), pic.tip.tone, "still"),
   ].join("\n");

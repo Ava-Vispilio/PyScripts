@@ -21,10 +21,9 @@
       .time.hot { background: #ff9d2e; color: #111; }
       .gold.hot { background: #f5b942; color: #111; }
       .card.hot { background: #e8e8e8; color: #111; }
-      #status { width: 39ch; max-width: 100%; box-sizing: border-box; color: #fff; padding: 0.15rem 0.4rem; text-align: center; }
-      #status.idle, #status.checking { background: #ca8a00; color: #111; }
-      #status.good { background: #1f7a3a; }
-      #status.bad { background: #b00000; }
+      .good.hot { background: #3fb950; color: #111; }
+      .bad.hot { background: #f85149; color: #111; }
+      .dim.hot { background: #888; color: #111; }
       #back { margin-top: 0.35rem; }
       .btn, .loop { cursor: pointer; }
     </style>
@@ -34,7 +33,6 @@
       <div id="player-note" class="dim">(IFrame, because TOS)</div>
       <div id="player"></div>
       <pre id="screen"></pre>
-      <div id="status"></div>
       <div id="back" class="dim"></div>
     </main>
     <script src="./main.js" defer></script>

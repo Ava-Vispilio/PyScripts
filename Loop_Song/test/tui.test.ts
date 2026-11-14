@@ -26,12 +26,12 @@ test("a pasted link arrives as one character per press", () => {
   expect(pressesOf(link)).toEqual([...link]);
 });
 
-test("up and down are the only arrows that act", () => {
+test("all four arrows act: up and down jump sections, left and right walk within one", () => {
   for (const focus of ["url", "start", "end", "play", "speed", "mode"] as const) {
     expect(keyOf("\x1b[A", focus)).toEqual({ kind: "arrow", dir: "up" });
     expect(keyOf("\x1b[B", focus)).toEqual({ kind: "arrow", dir: "down" });
-    expect(keyOf("\x1b[C", focus)).toBeNull();
-    expect(keyOf("\x1b[D", focus)).toBeNull();
+    expect(keyOf("\x1b[C", focus)).toEqual({ kind: "side", dir: "right" });
+    expect(keyOf("\x1b[D", focus)).toEqual({ kind: "side", dir: "left" });
   }
 });
 

@@ -1,4 +1,4 @@
-import { newGame, nudgeSpot, stage, step, type Action, type Game } from "./game";
+import { newGame, nudgeSide, nudgeSpot, stage, step, type Action, type Game } from "./game";
 import { composeUrl } from "./share";
 import { ansi } from "./text";
 
@@ -7,6 +7,7 @@ const DIGIT = /^[\d.]$/;
 
 type Key =
   | { kind: "arrow"; dir: "up" | "down" }
+  | { kind: "side"; dir: "left" | "right" }
   | { kind: "enter" }
   | { kind: "restart" }
   | { kind: "quit" }
@@ -16,13 +17,15 @@ type Key =
 export function keyOf(press: string, focus: Game["focus"]): Key | null {
   if (press === "\x1b[A") return { kind: "arrow", dir: "up" };
   if (press === "\x1b[B") return { kind: "arrow", dir: "down" };
+  if (press === "\x1b[C") return { kind: "side", dir: "right" };
+  if (press === "\x1b[D") return { kind: "side", dir: "left" };
   if (press === "\r" || press === "\n") return { kind: "enter" };
   if (press === "\x7f" || press === "\b") return { kind: "backspace" };
   if (press === "\x1b") return { kind: "restart" };
   if (press === "\x03") return { kind: "quit" };
-  // Up and down walk the spots; left and right do nothing. Typing follows the
-  // spot: the URL takes every printable, the time fields take digits and a
-  // dot, and the chips take nothing at all.
+  // Up and down jump between sections, left and right walk within one. Typing
+  // follows the spot: the URL takes every printable, the time fields take
+  // digits and a dot, and the chips take nothing at all.
   if (focus === "url") return PRINTABLE.test(press) ? { kind: "char", ch: press } : null;
   if (focus === "start" || focus === "end") return DIGIT.test(press) ? { kind: "char", ch: press } : null;
   return null;
@@ -122,7 +125,8 @@ if (import.meta.main) {
         stdin.setRawMode(false);
         process.exit(0);
       }
-      if (key.kind === "arrow") act({ type: "focus", spot: nudgeSpot(game.focus, key.dir === "down" ? 1 : -1) });
+      if (key.kind === "arrow") act({ type: "focus", spot: nudgeSpot(game, key.dir === "down" ? 1 : -1) });
+      else if (key.kind === "side") act({ type: "focus", spot: nudgeSide(game.focus, key.dir === "right" ? 1 : -1) });
       else if (key.kind === "enter") {
         if (game.focus === "play") play();
         else enter();

@@ -7,9 +7,9 @@ todos:
   - id: tests
     content: Test link parsing, the load transitions the shells drive, section locks and unlocks, snippet validation, speed cycling, mode guards, the loop-URL round-trip
   - id: screen
-    content: Add the one screen: section-locked typing fields with a block caret, status-colored button rows, the loop row, play, speed, and mode chips, dense tips, the outcome bar
+    content: Add the one screen: section-locked typing fields with a block caret, state-colored buttons that say what Enter does, the loop row, play, speed, and mode chips above the timings, dense tips
   - id: tui
-    content: Add the ANSI terminal shell: up/down spot ring, Enter-driven controls, typing rules per spot, the oEmbed title fetch, launching the loop in the browser on the arming edge, Ctrl-C to quit
+    content: Add the ANSI terminal shell: up/down jump between sections, left/right walk within one, Enter-driven controls, typing rules per spot, the oEmbed title fetch, launching the loop in the browser on the arming edge, Ctrl-C to quit
   - id: web
     content: Add the static page: small IFrame player, same layout below it, its own oEmbed check, live progress bar, loop seeking, speed control, Enter and click drive the same spots, loop-URL entry
   - id: build
@@ -48,6 +48,8 @@ flowchart TD
   loaded -->|Enter on speed chip| speed[Speed cycles 0.25x to 2x, wrapping]
   loaded -->|type times, Enter| snippet[Times locked, loop mode on]
   snippet -->|Enter again| edit[Times unlocked, window kept]
+  snippet -->|mode chip to FULL| sealed[Loop: Full video, pair dim and out of the walk]
+  sealed -->|mode chip to SNIP| snippet
   loaded -->|Enter on play chip| launch[Page opens, audio loops]
   loaded -->|Esc| empty
   bad -->|type| empty2[Draft edited]
@@ -76,8 +78,13 @@ flowchart LR
     caret (load or unlock the URL, confirm or unlock the times, toggle play,
     cycle speed, toggle mode); `titled` and `notFound` are what a shell sends
     after its oEmbed check; `restart`.
+  - The spots group into three sections in screen order — URL, chips
+    (Play/Speed/Mode), times (Start/End). `nudgeSpot` jumps between sections
+    on a torus; `nudgeSide` walks a torus within a section (the URL stands
+    alone). A sealed pair — mode full with a kept window — leaves the walk
+    entirely; only the mode chip's toggle returns it.
   - Locks gate typing, never focus: a sealed URL and confirmed times stay in
-    the spot ring, because their Enter is the unlock. Unlocking the times
+    the section walk, because their Enter is the unlock. Unlocking the times
     keeps the confirmed window — the loop plays on until a new pair confirms.
   - The engine never fetches and never sleeps: both shells check oEmbed
     between `accept` and `titled`, the same way the Tic Tac Toe shells own the
@@ -87,11 +94,11 @@ flowchart LR
   back. Round-trip tested. The TUI launches this URL; the page loads it on
   entry.
 - `src/text.ts` paints the one screen. Fixed height, board width 39.
-- `src/tui.ts` writes ANSI and reads keys. Up and down walk the six spots;
-  Enter acts on the focused one. Enter on the play chip composes the loop URL
-  and opens it with the OS opener (`open` on macOS — a builtin, not an
-  installable dependency; if you would rather it never spawn anything, set
-  `LOOP_SONG_OPEN=0` and it prints the URL instead). It fetches the title from
+- `src/tui.ts` writes ANSI and reads keys. Up and down jump between the
+  sections; left and right walk within one; Enter acts on the focused spot.
+  Enter on the play chip composes the loop URL and opens it with the OS opener
+  (`open` on macOS — a builtin, not an installable dependency; set
+  `LOOP_SONG_OPEN=0` and it stays put instead). It fetches the title from
   YouTube's keyless oEmbed endpoint after `accept`; offline or private videos
   fall back to the raw videoId.
 - `src/page.ts` and `index.html` paint the same layout on black with a small
@@ -100,7 +107,9 @@ flowchart LR
   starts it). The page runs the same oEmbed check as the terminal, so a typed
   URL settles to loaded without the hash. It polls `getCurrentTime()` and
   seeks back to the snippet start when the playhead passes the end. Speed maps
-  to `setPlaybackRate`. The loop row becomes the live progress bar here.
+  to `setPlaybackRate`. The loop row becomes the live progress bar here —
+  zoomed to the snippet window in snippet mode, so the bar tracks the loop
+  itself rather than the whole video.
 
 ## The screen
 
@@ -109,47 +118,59 @@ LOOP SONG
 
 Video to load:
 https://youtu.be/dQw4w9WgXcQ
-[ Enter to choose another song ]
+[ Confirmed - Enter to Edit ]
 
 Never Gonna Give You Up · Rick Astley
 Loop: 12.0s → 18.0s (6.0s)
 
+[ Pause ]  [ 1.25x ]  [ Loop: SNIP ]
+
 Start / End Timings
 Start: 12
 End:   18
-[ Enter to edit ]
+[ Confirmed - Enter to Edit ]
 
-[ Play ]  [ 1.00x ]  [ Loop: SNIP ]
-
-↑↓ = Move, Enter = Select, Esc = Reset
-              Snippet set
+↑↓ = Move, ←→ = Switch, Enter = Toggle
 Esc = Reset, Ctrl-C = Quit
 ```
 
-- **Six spots, three of them typing fields.** Up and down walk the ring —
-  URL, Start, End, Play, Speed, Mode — and the focused piece renders hot.
-  The video name and the loop row are display only and never take the caret.
-- **Section locks.** A good load seals the URL: the field stops typing, the
-  button reads `[ Enter to choose another song ]`, and Enter on the URL
-  unlocks it again. The times lock the same way — Enter confirms, Enter
-  again unlocks for editing while the confirmed window keeps looping. An
-  empty pair ignores Enter rather than flashing red.
+- **Three sections, six spots.** Up and down jump between the sections in
+  screen order — URL, chips, times — wrapping at both ends; left and right
+  walk within a section (the chip row, Start↔End; the URL stands alone). The
+  focused piece renders hot. The video name and the loop row are display only
+  and never take the caret.
+- **Section locks, and buttons that say what they do.** A good load seals the
+  URL: the field stops typing and the button reads green
+  `[ Confirmed - Enter to Edit ]`; Enter on the URL unlocks it again. The
+  times lock the same way — Enter confirms, Enter again unlocks for editing
+  while the confirmed window keeps looping — and a locked pair renders green
+  instead of orange. An empty pair ignores Enter, and a half-typed pair hops
+  the caret to the missing field, so Enter never flashes red on a work in
+  progress; red waits for a whole pair that cannot parse or runs backwards.
+  And while the loop plays the full video on purpose — mode FULL with a kept
+  window — the pair seals itself away: it leaves the section walk, dims, and
+  its button reads `[ Loop is FULL ]`; the mode chip is the way back.
 - **The load button** carries the pipeline: dim `[ Enter to load ]` when
-  idle, yellow while checking, card `[ Enter to choose another song ]` once
-  loaded and sealed, red `[ Bad link ]` or `[ Not found ]` on failure, with
-  the draft kept for editing.
+  idle, yellow `[ Checking ]` while checking, green
+  `[ Confirmed - Enter to Edit ]` once loaded and sealed, red `[ Bad link ]`
+  or `[ Not found ]` on failure, with the draft kept for editing.
 - **The loop row** is honest per shell. The TUI shows the confirmed window as
   text — it cannot know the duration, so it draws no bar. The page draws the
-  live bar: full-video track, snippet window lit, playhead pip inside it.
-- **Chips.** `[ Play | Pause ]` launches the loop (TUI, only on the arming
-  edge) or toggles the player (page). `[ 1.00x ]` cycles YouTube's speed
-  steps (0.25x to 2x, wrapping). `[ Loop: FULL | SNIP ]` toggles the mode,
-  refused in snippet mode until times are confirmed. Enter on a focused chip
-  is the only way in.
+  live bar: in snippet mode the bar spans the window only, zoomed in so a
+  short loop moves as fast as it feels; in full mode it tracks the whole
+  video with the playhead pip inside it.
+- **Chips, above the timings.** `[ Play | Pause ]` launches the loop (TUI,
+  only on the arming edge) or toggles the player (page), and reads green
+  while armed. `[ 1.00x ]` cycles YouTube's speed steps (0.25x to 2x,
+  wrapping), gold whenever the speed is not 1. `[ Loop: FULL | SNIP ]`
+  toggles the mode — refused until times are confirmed — gold in snippet
+  mode. Enter on a focused chip is the only way in.
 - **Snippet section.** Times are typed in seconds — digits and a dot are the
   only keys the fields take — confirmed with Enter, validated as
-  `0 ≤ start < end` (against the real duration on the page). Until a video
-  loads the section sits dim.
+  `0 ≤ start < end` (against the real duration on the page). Enter on a
+  half-typed pair hops the caret to the missing field. Until a video loads
+  the section sits dim, and while the loop runs FULL over a kept window it
+  sits out of the walk as well.
 
 ## Key map
 
@@ -159,9 +180,9 @@ No letter commands remain: every action is an arrow or an Enter, so no field
 
 | Key | Acts |
 | --- | --- |
-| ↑ ↓ | move between the six spots (URL, Start, End, Play, Speed, Mode) |
+| ↑ ↓ | jump between the sections in screen order (URL, chips, times), wrapping; a sealed pair sits out |
+| ← → | walk within the focused section (chips, Start↔End); the URL stands alone |
 | Enter | act on the focused spot: load/unlock the URL, confirm/unlock the times, toggle play, cycle speed, toggle mode |
-| ← → | nothing |
 | Esc | reset to the empty form |
 | Ctrl-C | quit (terminal only) |
 
@@ -173,12 +194,11 @@ straight into the loaded state.
 
 - Title gold, the repo standard.
 - The URL field cyan, Start and End orange, matching the repo's two-endpoints
-  pairing from Tic Tac Toe.
-- The focused spot renders dark text on its color; button rows take their
-  status color (dim, yellow, green, red) and run hot while their section
-  holds the caret.
-- The bar carries the outcome (guideline 29): yellow `Type a link` or
-  `Checking`, green `Loaded` or `Snippet set`, red `Bad link` or `Not found`.
+  pairing from Tic Tac Toe. Locked times turn green: the pair is confirmed.
+- The focused spot renders dark text on its color; every button and chip
+  carries its own state color — dim when idle, yellow while checking or set
+  apart from 1, green when confirmed or armed, red on failure — so no
+  separate outcome bar is needed.
 
 ## New patterns beyond the guidelines
 
@@ -193,18 +213,22 @@ Flagged for the next distillation round:
 3. **Shell-crossing by URL.** The TUI hands a loop to the browser as a composed
    URL — no shared process state, the codec is the contract.
 4. **Section locks.** A confirmed section seals itself and unlocks on Enter.
-   Locks gate typing, never focus: the ring must always reach the unlock.
+   Locks gate typing, never focus: the section walk must always reach the
+   unlock. One deliberate exception: a pair kept while the loop runs FULL
+   steps out of the walk entirely, because its way back is the mode chip, not
+   Enter on the fields — the walk still reaches the way back.
 
 ## Verify
 
 `tsc --noEmit`, then `bun test`. Drive the terminal binary through a real pty:
 type a URL, load it, watch the title arrive and the seal close, arrow down
-through all six spots, type and confirm a snippet, Enter again to unlock it,
-cycle the speed chip, toggle the mode chip, Enter on Play and watch the browser
-take the loop, reset with Esc, quit. Serve the page on 127.0.0.1 and check by
-hand: a typed URL settles to loaded through the page's own oEmbed check, the
-loop seeks at the snippet end, the chips work by Enter and by click, a `#v=…`
-hash lands loaded. Stop the server after.
+through the three sections and left and right through the chip row, type and
+confirm a snippet, Enter again to unlock it, cycle the speed chip, toggle the
+mode chip, Enter on Play and watch the browser take the loop, reset with Esc,
+quit. Serve the page on 127.0.0.1 and check by hand: a typed URL settles to
+loaded through the page's own oEmbed check, the loop seeks at the snippet end
+and the live bar spans the snippet window, the chips work by Enter and by
+click, a `#v=…` hash lands loaded. Stop the server after.
 
 ## Build and deploy
 

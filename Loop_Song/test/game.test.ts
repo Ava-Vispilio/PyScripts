@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   cycleSpeed,
   newGame,
+  nudgeSide,
   nudgeSpot,
   SPEEDS,
   stage,
@@ -189,6 +190,29 @@ describe("the snippet", () => {
     expect(step(loaded, { type: "accept" })).toBe(loaded);
   });
 
+  test("Enter on a half-typed pair hops the caret to the missing field", () => {
+    let game = stage("loaded")!;
+    game = typeAll(game, "12");
+    const hop = step(game, { type: "accept" });
+    expect(hop.focus).toBe("end");
+    expect(hop.snip).toBe("empty");
+    expect(hop.window).toBeNull();
+    // Enter again with the caret already on the missing field stays put.
+    expect(step(hop, { type: "accept" })).toEqual(hop);
+  });
+
+  test("a lone End hops back to Start, before any video too", () => {
+    let game = stage("loaded")!;
+    game = typeAll(step(game, { type: "focus", spot: "end" }), "18");
+    expect(step(game, { type: "accept" }).focus).toBe("start");
+    let bare = newGame();
+    bare = typeAll(step(bare, { type: "focus", spot: "start" }), "12");
+    const hopped = step(bare, { type: "accept" });
+    expect(hopped.focus).toBe("end");
+    expect(hopped.snip).toBe("empty");
+    expect(hopped.window).toBeNull();
+  });
+
   test("locked times refuse the keys, and Enter unlocks while keeping the window", () => {
     const snippet = stage("snippet")!;
     const locked = step(snippet, { type: "type", ch: "9" });
@@ -254,14 +278,50 @@ describe("speed, mode, and play", () => {
 });
 
 describe("spots and reset", () => {
-  test("the spot ring visits all six, wrapping both ways", () => {
-    expect(nudgeSpot("url", 1)).toBe("start");
-    expect(nudgeSpot("start", 1)).toBe("end");
-    expect(nudgeSpot("end", 1)).toBe("play");
-    expect(nudgeSpot("play", 1)).toBe("speed");
-    expect(nudgeSpot("speed", 1)).toBe("mode");
-    expect(nudgeSpot("mode", 1)).toBe("url");
-    expect(nudgeSpot("url", -1)).toBe("mode");
+  test("vertical movement jumps between sections, wrapping both ways", () => {
+    const at = (spot: Game["focus"]): Game => step(newGame(), { type: "focus", spot });
+    expect(nudgeSpot(at("url"), 1)).toBe("play");
+    expect(nudgeSpot(at("play"), 1)).toBe("start");
+    expect(nudgeSpot(at("speed"), 1)).toBe("start");
+    expect(nudgeSpot(at("mode"), 1)).toBe("start");
+    expect(nudgeSpot(at("start"), 1)).toBe("url");
+    expect(nudgeSpot(at("end"), 1)).toBe("url");
+    expect(nudgeSpot(at("url"), -1)).toBe("end");
+    expect(nudgeSpot(at("start"), -1)).toBe("mode");
+    expect(nudgeSpot(at("end"), -1)).toBe("mode");
+  });
+
+  test("a sealed pair leaves the section walk while the loop is full", () => {
+    const sealed = stage("fullloop")!;
+    expect(sealed.mode).toBe("full");
+    expect(sealed.window).toEqual([12, 18]);
+    // The caret rides the mode chip, and both arrows skip the pair.
+    expect(sealed.focus).toBe("mode");
+    expect(nudgeSpot(sealed, 1)).toBe("url");
+    expect(nudgeSpot(sealed, -1)).toBe("url");
+    const onUrl = step(sealed, { type: "focus", spot: "url" });
+    expect(nudgeSpot(onUrl, 1)).toBe("play");
+    expect(nudgeSpot(onUrl, -1)).toBe("mode");
+    // The sealed fields refuse the caret outright.
+    expect(step(sealed, { type: "focus", spot: "start" })).toBe(sealed);
+    expect(step(sealed, { type: "focus", spot: "end" })).toBe(sealed);
+    // The mode chip is the way back: toggling to the snippet returns the pair.
+    const snip = step(sealed, { type: "accept" });
+    expect(snip.mode).toBe("snippet");
+    expect(nudgeSpot(snip, 1)).toBe("start");
+  });
+
+  test("horizontal movement walks a torus within a section, and the URL stands alone", () => {
+    expect(nudgeSide("play", 1)).toBe("speed");
+    expect(nudgeSide("speed", 1)).toBe("mode");
+    expect(nudgeSide("mode", 1)).toBe("play");
+    expect(nudgeSide("mode", -1)).toBe("speed");
+    expect(nudgeSide("play", -1)).toBe("mode");
+    expect(nudgeSide("start", 1)).toBe("end");
+    expect(nudgeSide("end", 1)).toBe("start");
+    expect(nudgeSide("end", -1)).toBe("start");
+    expect(nudgeSide("url", 1)).toBe("url");
+    expect(nudgeSide("url", -1)).toBe("url");
   });
 
   test("restart returns a fresh form from anywhere", () => {
@@ -275,6 +335,7 @@ describe("spots and reset", () => {
     expect(stage("loaded")!.load).toBe("loaded");
     expect(stage("snippet")!.mode).toBe("snippet");
     expect(stage("snippet")!.urlLocked).toBe(true);
+    expect(stage("fullloop")!.mode).toBe("full");
     expect(stage("bad")!.load).toBe("badLink");
     expect(stage("notfound")!.load).toBe("notFound");
     expect(stage("badtimes")!.snip).toBe("bad");

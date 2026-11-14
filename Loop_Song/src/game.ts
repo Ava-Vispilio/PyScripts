@@ -78,14 +78,39 @@ export function videoIdOf(text: string): string | null {
   return null;
 }
 
+/** The sections in screen order: the URL, the chip row, the time pair. */
+const SECTIONS: Spot[][] = [["url"], ["play", "speed", "mode"], ["start", "end"]];
+
 /**
- * Move between the six spots on a torus, so every arrow lands somewhere.
- * Locked sections stay in the ring: their Enter is the unlock.
+ * While the loop plays the full video on purpose — a confirmed window kept,
+ * the mode toggled back — the time pair sits out of the walk: it has nothing
+ * to say. The mode chip is the way back in.
  */
-export function nudgeSpot(spot: Spot, dir: 1 | -1): Spot {
-  const SPOTS: Spot[] = ["url", "start", "end", "play", "speed", "mode"];
-  const n = SPOTS.length;
-  return SPOTS[(SPOTS.indexOf(spot) + dir + n) % n]!;
+export const timesSealed = (game: Game): boolean => game.mode === "full" && game.window !== null;
+
+const sectionsOf = (game: Game): Spot[][] => (timesSealed(game) ? SECTIONS.slice(0, 2) : SECTIONS);
+
+/**
+ * Up and down jump between sections on a torus, so every arrow lands somewhere.
+ * Down lands on the next section's first spot, up on the previous section's
+ * last. Locked sections stay reachable: their Enter is the unlock. A sealed
+ * time pair leaves the walk entirely; the toggle back to the snippet returns it.
+ */
+export function nudgeSpot(game: Game, dir: 1 | -1): Spot {
+  const sections = sectionsOf(game);
+  const si = sections.findIndex((section) => section.includes(game.focus));
+  if (si === -1) return "url";
+  const n = sections.length;
+  const next = sections[(si + dir + n) % n]!;
+  return dir === 1 ? next[0]! : next[next.length - 1]!;
+}
+
+/** Left and right walk a torus within the section; the URL stands alone. */
+export function nudgeSide(spot: Spot, dir: 1 | -1): Spot {
+  const section = SECTIONS.find((spots) => spots.includes(spot))!;
+  if (section.length < 2) return spot;
+  const n = section.length;
+  return section[(section.indexOf(spot) + dir + n) % n]!;
 }
 
 /** Cycle through YouTube's playback speeds, wrapping at both ends. */
@@ -125,7 +150,11 @@ function edit(game: Game, action: { type: "type"; ch: string } | { type: "backsp
   return { ...game, ...base };
 }
 
-/** Enter acts on the focused spot: load or unlock the URL, confirm or unlock the times, toggle play, cycle speed or mode. */
+/**
+ * Enter acts on the focused spot: load or unlock the URL, confirm or unlock
+ * the times (hopping to the missing field while the pair is half-typed),
+ * toggle play, cycle speed or mode.
+ */
 function accept(game: Game): Game {
   if (game.focus === "url") {
     if (game.load === "checking") return game;
@@ -138,9 +167,15 @@ function accept(game: Game): Game {
     return { ...game, load: "checking", urlLocked: true, ...cleared, focus: "start" };
   }
   if (game.focus === "start" || game.focus === "end") {
+    // Enter means "next" until the pair is whole: the caret hops to the
+    // missing field instead of failing on a half-typed window.
+    if (game.snip !== "set") {
+      if (game.start.trim() === "" && game.end.trim() === "") return game;
+      if (game.start.trim() === "") return { ...game, focus: "start" };
+      if (game.end.trim() === "") return { ...game, focus: "end" };
+    }
     if (game.load !== "loaded") return game;
     if (game.snip === "set") return { ...game, snip: "empty" };
-    if (game.start.trim() === "" && game.end.trim() === "") return game;
     const start = parseTime(game.start);
     const end = parseTime(game.end);
     if (start === null || end === null || start < 0 || start >= end)
@@ -155,7 +190,11 @@ function accept(game: Game): Game {
 
 export function step(game: Game, action: Action): Game {
   if (action.type === "restart") return newGame();
-  if (action.type === "focus") return { ...game, focus: action.spot };
+  if (action.type === "focus") {
+    // A sealed pair is off the walk, so it refuses the caret as well.
+    if (timesSealed(game) && (action.spot === "start" || action.spot === "end")) return game;
+    return { ...game, focus: action.spot };
+  }
   if (action.type === "type" || action.type === "backspace") {
     if (game.load === "checking") return game;
     return edit(game, action);
@@ -190,6 +229,8 @@ export function stage(name: string): Game | null {
     return step(game, { type: "accept" });
   };
   if (name === "snippet") return withTimes("12", "18");
+  if (name === "fullloop")
+    return step(step(withTimes("12", "18"), { type: "focus", spot: "mode" }), { type: "accept" });
   if (name === "bad") return loadUrl("not a link");
   if (name === "notfound") return step(loadUrl("https://youtu.be/dQw4w9WgXcQ"), { type: "notFound" });
   if (name === "badtimes") return withTimes("18", "12");

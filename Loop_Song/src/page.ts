@@ -1,6 +1,6 @@
-import { newGame, nudgeSpot, stage, step, type Action, type Game } from "./game";
+import { newGame, nudgeSide, nudgeSpot, stage, step, timesSealed, type Action, type Game } from "./game";
 import { decode, open } from "./share";
-import { backOf, markup, statusOf, barOf } from "./text";
+import { backOf, markup } from "./text";
 
 /** The slice of the IFrame API the page uses, declared by hand: no dependency, no types package. */
 type Player = {
@@ -24,7 +24,6 @@ function need(id: string): HTMLElement {
 }
 
 const board = need("#screen");
-const bar = need("#status");
 const back = need("#back");
 
 let game = opened();
@@ -46,8 +45,6 @@ function opened(): Game {
 
 function draw() {
   board.innerHTML = markup(game);
-  bar.textContent = statusOf(game);
-  bar.className = barOf(game);
   back.textContent = backOf;
 }
 
@@ -125,19 +122,24 @@ async function check() {
   if (game.load === "checking" && game.videoId === id) act(action);
 }
 
-/** The loop row becomes the live bar here: track, snippet window, played span, playhead. */
+/**
+ * The loop row becomes the live bar here: a track with the played span and the
+ * playhead pip. In snippet mode the bar spans the window only — zoomed in, so
+ * a short loop moves as fast as it feels.
+ */
 function drawLoop(t: number, d: number) {
   const loopEl = document.querySelector("[data-loop]");
   if (!(loopEl instanceof HTMLElement)) return;
   const n = 37;
   const chars: string[] = Array<string>(n).fill("·");
-  const frac = (x: number) => (d > 0 ? Math.max(0, Math.min(1, x / d)) : 0);
+  let frac: number;
   if (game.mode === "snippet" && game.window) {
-    const a = Math.round(frac(game.window[0]) * n);
-    const b = Math.round(frac(game.window[1]) * n);
-    for (let i = a; i < b; i++) chars[i] = "▒";
+    const span = Math.max(0.05, game.window[1] - game.window[0]);
+    frac = Math.max(0, Math.min(1, (t - game.window[0]) / span));
+  } else {
+    frac = d > 0 ? Math.max(0, Math.min(1, t / d)) : 0;
   }
-  const played = Math.min(n, Math.round(frac(t) * n));
+  const played = Math.min(n, Math.round(frac * n));
   for (let i = 0; i < played; i++) chars[i] = "█";
   if (played < n) chars[played] = "▌";
   loopEl.textContent = `[${chars.join("")}]`;
@@ -192,7 +194,12 @@ document.addEventListener("keydown", (event) => {
   if (event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
   if (event.key === "ArrowUp" || event.key === "ArrowDown") {
     event.preventDefault();
-    act({ type: "focus", spot: nudgeSpot(game.focus, event.key === "ArrowDown" ? 1 : -1) });
+    act({ type: "focus", spot: nudgeSpot(game, event.key === "ArrowDown" ? 1 : -1) });
+    return;
+  }
+  if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+    event.preventDefault();
+    act({ type: "focus", spot: nudgeSide(game.focus, event.key === "ArrowRight" ? 1 : -1) });
     return;
   }
   if (event.key === "Enter") {
@@ -239,7 +246,9 @@ document.addEventListener("click", (event) => {
     return;
   }
   if (event.target.closest("[data-snip]")) {
-    act({ type: "focus", spot: "end" });
+    // While the pair is sealed the button is the way back to the snippet, so
+    // the click lands on the mode chip instead of the unreachable fields.
+    act({ type: "focus", spot: timesSealed(game) ? "mode" : "end" });
     act({ type: "accept" });
     return;
   }
