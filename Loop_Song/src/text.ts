@@ -123,7 +123,7 @@ export function picture(game: Game): Picture {
       tone: game.mode === "snippet" ? "gold" : "card",
       look: focused("mode"),
     },
-    timesTitle: { text: "Start / End Timings", tone: "dim", look: "still" },
+    timesTitle: { text: "Start / End Timings (in seconds)", tone: "dim", look: "still" },
     startLabel: { text: "Start: ", tone: "dim", look: "still" },
     startField: { text: tail(game.start + caret("start"), WIDTH - 7), tone: timeTone(game), look: focused("start") },
     endLabel: { text: "End:   ", tone: "dim", look: "still" },

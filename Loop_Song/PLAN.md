@@ -125,7 +125,7 @@ Loop: 12.0s → 18.0s (6.0s)
 
 [ Pause ]  [ 1.25x ]  [ Loop: SNIP ]
 
-Start / End Timings
+Start / End Timings (in seconds)
 Start: 12
 End:   18
 [ Confirmed - Enter to Edit ]

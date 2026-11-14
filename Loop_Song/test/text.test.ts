@@ -21,7 +21,7 @@ test("the empty form lays out as planned", () => {
   expect(lines[6]).toBe("-");
   expect(lines[7]).toBe("Loop: -");
   expect(lines[9]).toBe("  [ Play ]  [ 1.00x ]  [ Loop: FULL ]  ");
-  expect(lines[11]).toBe("Start / End Timings");
+  expect(lines[11]).toBe("Start / End Timings (in seconds)");
   expect(lines[12]).toBe("Start: ");
   expect(lines[13]).toBe("End:   ");
   expect(lines[14]).toBe("[ Enter to confirm ]");
