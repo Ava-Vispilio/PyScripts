@@ -1,40 +1,31 @@
-import { newGame, nudgeField, stage, step, type Action, type Dir, type Game } from "./game";
+import { newGame, nudgeSpot, stage, step, type Action, type Game } from "./game";
 import { composeUrl } from "./share";
 import { ansi } from "./text";
 
-const ARROWS: Record<string, Dir> = { "\x1b[A": "up", "\x1b[B": "down", "\x1b[C": "right", "\x1b[D": "left" };
-
 const PRINTABLE = /^[\x20-\x7e]$/;
+const DIGIT = /^[\d.]$/;
 
 type Key =
-  | { kind: "arrow"; dir: Dir }
+  | { kind: "arrow"; dir: "up" | "down" }
   | { kind: "enter" }
-  | { kind: "speed"; dir: 1 | -1 }
-  | { kind: "play" }
-  | { kind: "mode" }
   | { kind: "restart" }
   | { kind: "quit" }
   | { kind: "backspace" }
   | { kind: "char"; ch: string };
 
 export function keyOf(press: string, focus: Game["focus"]): Key | null {
-  const dir = ARROWS[press];
-  if (dir) return { kind: "arrow", dir };
+  if (press === "\x1b[A") return { kind: "arrow", dir: "up" };
+  if (press === "\x1b[B") return { kind: "arrow", dir: "down" };
   if (press === "\r" || press === "\n") return { kind: "enter" };
   if (press === "\x7f" || press === "\b") return { kind: "backspace" };
   if (press === "\x1b") return { kind: "restart" };
   if (press === "\x03") return { kind: "quit" };
-  // In the URL field every printable types — ids legally carry p, m, r, q and
-  // the speed signs — so the letter commands live only in the time fields,
-  // whose drafts take digits and a dot and nothing else.
+  // Up and down walk the spots; left and right do nothing. Typing follows the
+  // spot: the URL takes every printable, the time fields take digits and a
+  // dot, and the chips take nothing at all.
   if (focus === "url") return PRINTABLE.test(press) ? { kind: "char", ch: press } : null;
-  if (press === "+" || press === "=") return { kind: "speed", dir: 1 };
-  if (press === "-") return { kind: "speed", dir: -1 };
-  if (press === "p" || press === "P") return { kind: "play" };
-  if (press === "m" || press === "M") return { kind: "mode" };
-  if (press === "r" || press === "R") return { kind: "restart" };
-  if (press === "q" || press === "Q") return { kind: "quit" };
-  return PRINTABLE.test(press) ? { kind: "char", ch: press } : null;
+  if (focus === "start" || focus === "end") return DIGIT.test(press) ? { kind: "char", ch: press } : null;
+  return null;
 }
 
 /** The terminal hands us whatever arrived, so a fast arrow-plus-Enter is one chunk. */
@@ -52,9 +43,6 @@ export function pressesOf(text: string): string[] {
   }
   return out;
 }
-
-/** Up and left climb the field ring, down and right descend it. */
-const ringDir = (dir: Dir): 1 | -1 => (dir === "down" || dir === "right" ? 1 : -1);
 
 const PAGE_BASE = process.env.LOOP_SONG_PAGE ?? "https://ava-vispilio.github.io/PyScripts/Loop_Song/";
 
@@ -111,10 +99,11 @@ if (import.meta.main) {
     }
   }
 
+  /** Enter on the play chip arms or disarms; only the arming edge opens the browser. */
   function play() {
-    if (game.load !== "loaded") return;
-    act({ type: "arm" });
-    launch();
+    const wasArmed = game.armed;
+    act({ type: "accept" });
+    if (!wasArmed && game.armed) launch();
   }
 
   function enter() {
@@ -133,12 +122,11 @@ if (import.meta.main) {
         stdin.setRawMode(false);
         process.exit(0);
       }
-      if (key.kind === "arrow") act({ type: "focus", field: nudgeField(game.focus, ringDir(key.dir)) });
-      else if (key.kind === "enter") enter();
-      else if (key.kind === "speed") act({ type: key.dir === 1 ? "faster" : "slower" });
-      else if (key.kind === "play") play();
-      else if (key.kind === "mode") act({ type: "toggleMode" });
-      else if (key.kind === "restart") act({ type: "restart" });
+      if (key.kind === "arrow") act({ type: "focus", spot: nudgeSpot(game.focus, key.dir === "down" ? 1 : -1) });
+      else if (key.kind === "enter") {
+        if (game.focus === "play") play();
+        else enter();
+      } else if (key.kind === "restart") act({ type: "restart" });
       else if (key.kind === "backspace") act({ type: "backspace" });
       else act({ type: "type", ch: key.ch });
     }

@@ -43,17 +43,25 @@ export function open(parts: Parts): Game {
   game = step(game, { type: "accept" });
   game = step(game, { type: "titled", title: parts.videoId });
   if (parts.window) {
-    game = step(game, { type: "focus", field: "start" });
+    game = step(game, { type: "focus", spot: "start" });
     for (const ch of String(parts.window[0])) game = step(game, { type: "type", ch });
-    game = step(game, { type: "focus", field: "end" });
+    game = step(game, { type: "focus", spot: "end" });
     for (const ch of String(parts.window[1])) game = step(game, { type: "type", ch });
     game = step(game, { type: "accept" });
   }
+  // The speed chip cycles forward on Enter, so the wrap-around distance is
+  // the forward distance on the SPEEDS ring.
   const target = SPEEDS.indexOf(parts.speed as (typeof SPEEDS)[number]);
   const base = SPEEDS.indexOf(1);
-  for (let i = 0; i < Math.abs(target - base); i++)
-    game = step(game, { type: target > base ? "faster" : "slower" });
-  if (parts.mode === "full" && game.mode === "snippet") game = step(game, { type: "toggleMode" });
+  if (target !== -1 && target !== base) {
+    game = step(game, { type: "focus", spot: "speed" });
+    const hops = (target - base + SPEEDS.length) % SPEEDS.length;
+    for (let i = 0; i < hops; i++) game = step(game, { type: "accept" });
+  }
+  if (parts.mode === "full" && game.mode === "snippet") {
+    game = step(game, { type: "focus", spot: "mode" });
+    game = step(game, { type: "accept" });
+  }
   return game;
 }
 

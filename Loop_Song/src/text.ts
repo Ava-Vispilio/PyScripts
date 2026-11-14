@@ -5,7 +5,7 @@ export type Look = "still" | "hot";
 export type Bar = "idle" | "checking" | "good" | "bad";
 export type Piece = { text: string; tone: Tone; look: Look };
 
-/** One settled screen. Fixed height: the same twenty rows for every state. */
+/** One settled screen. Fixed height: the same nineteen rows for every state. */
 export type Picture = {
   title: Piece;
   urlLabel: Piece;
@@ -13,16 +13,15 @@ export type Picture = {
   loadButton: Piece;
   name: Piece;
   loop: Piece;
-  speedMinus: Piece;
-  speedValue: Piece;
-  speedPlus: Piece;
-  playChip: Piece;
-  modeChip: Piece;
+  timesTitle: Piece;
   startLabel: Piece;
   startField: Piece;
   endLabel: Piece;
   endField: Piece;
   snipButton: Piece;
+  playChip: Piece;
+  speedChip: Piece;
+  modeChip: Piece;
   tip: Piece;
   status: string;
   bar: Bar;
@@ -30,11 +29,10 @@ export type Picture = {
 
 export const WIDTH = 39;
 const TITLE = "LOOP SONG";
-const TIP = "P = Play, +/- = Speed, M = Mode";
+const TIP = "↑↓ = Move, Enter = Select, Esc = Reset";
 
-/** The reset hint sits under the status bar, and follows the focused field: in the URL field every printable types, so reset and quit lose their letter keys there. */
-export const backOf = (game: Game): string =>
-  game.focus === "url" ? "Esc = Reset, Ctrl-C = Quit" : "Esc or R = Reset, Q = Quit";
+/** The reset hint is constant now: no letter commands remain to shadow. */
+export const backOf = "Esc = Reset, Ctrl-C = Quit";
 
 const SGR: Record<Tone, string> = {
   url: "96;1",
@@ -90,18 +88,21 @@ export function barOf(game: Game): Bar {
   return "good";
 }
 
-function loadButton(game: Game): Piece {
-  if (game.load === "checking") return { text: "[ Checking ]", tone: "gold", look: "still" };
-  if (game.load === "loaded") return { text: "[ Loaded ]", tone: "good", look: "still" };
-  if (game.load === "badLink") return { text: "[ Bad link ]", tone: "bad", look: "still" };
-  if (game.load === "notFound") return { text: "[ Not found ]", tone: "bad", look: "still" };
-  return { text: "[ Enter to load ]", tone: "dim", look: "still" };
+function loadButton(game: Game, hot: boolean): Piece {
+  const look: Look = hot ? "hot" : "still";
+  if (game.load === "checking") return { text: "[ Checking ]", tone: "gold", look };
+  if (game.load === "badLink") return { text: "[ Bad link ]", tone: "bad", look };
+  if (game.load === "notFound") return { text: "[ Not found ]", tone: "bad", look };
+  if (game.load === "loaded" && game.urlLocked)
+    return { text: "[ Enter to choose another song ]", tone: "card", look };
+  return { text: "[ Enter to load ]", tone: "dim", look };
 }
 
-function snipButton(game: Game): Piece {
-  if (game.snip === "bad") return { text: "[ Bad times ]", tone: "bad", look: "still" };
-  if (game.snip === "set" && game.load === "loaded") return { text: "[ Snippet set ]", tone: "good", look: "still" };
-  return { text: "[ Enter to confirm ]", tone: "dim", look: "still" };
+function snipButton(game: Game, hot: boolean): Piece {
+  const look: Look = hot ? "hot" : "still";
+  if (game.snip === "bad") return { text: "[ Bad times ]", tone: "bad", look };
+  if (game.snip === "set" && game.load === "loaded") return { text: "[ Enter to edit ]", tone: "good", look };
+  return { text: "[ Enter to confirm ]", tone: "dim", look };
 }
 
 function loopPiece(game: Game): Piece {
@@ -116,33 +117,37 @@ const timeTone = (game: Game): Tone => (game.load === "loaded" ? "time" : "dim")
 
 /** One settled screen, with a color and a highlight on every piece. */
 export function picture(game: Game): Picture {
-  const focused = (field: Game["focus"]): Look => (game.focus === field ? "hot" : "still");
-  const caret = (field: Game["focus"]): string => (game.focus === field ? "▌" : "");
+  const focused = (spot: Game["focus"]): Look => (game.focus === spot ? "hot" : "still");
+  // A caret rides a focused field only while it can still be typed into.
+  const caret = (spot: "url" | "start" | "end"): string => {
+    if (game.focus !== spot) return "";
+    if (spot === "url") return game.urlLocked ? "" : "▌";
+    return game.snip === "set" ? "" : "▌";
+  };
+  const inTimes = game.focus === "start" || game.focus === "end";
   return {
     title: { text: TITLE, tone: "gold", look: "still" },
-    urlLabel: { text: "Video to load", tone: "dim", look: "still" },
+    urlLabel: { text: "Video to load:", tone: "dim", look: "still" },
     urlField: { text: tail(game.url + caret("url"), WIDTH), tone: "url", look: focused("url") },
-    loadButton: loadButton(game),
+    loadButton: loadButton(game, game.focus === "url"),
     name: { text: head(game.title ?? "-", WIDTH), tone: game.title ? "card" : "dim", look: "still" },
     loop: loopPiece(game),
-    speedMinus: { text: "-", tone: "gold", look: "still" },
-    speedValue: { text: `${game.speed.toFixed(2)}x`, tone: "gold", look: "still" },
-    speedPlus: { text: "+", tone: "gold", look: "still" },
-    playChip: { text: "[ P = Play ]", tone: "card", look: game.armed ? "hot" : "still" },
-    modeChip: { text: game.mode === "snippet" ? "[ Loop: SNIP ]" : "[ Loop: FULL ]", tone: "card", look: game.mode === "snippet" ? "hot" : "still" },
-    startLabel: { text: "Start Timing: ", tone: "dim", look: "still" },
-    startField: { text: tail(game.start + caret("start"), WIDTH - 14), tone: timeTone(game), look: focused("start") },
-    endLabel: { text: "End Timing:   ", tone: "dim", look: "still" },
-    endField: { text: tail(game.end + caret("end"), WIDTH - 14), tone: timeTone(game), look: focused("end") },
-    snipButton: snipButton(game),
+    timesTitle: { text: "Start / End Timings", tone: "dim", look: "still" },
+    startLabel: { text: "Start: ", tone: "dim", look: "still" },
+    startField: { text: tail(game.start + caret("start"), WIDTH - 7), tone: timeTone(game), look: focused("start") },
+    endLabel: { text: "End:   ", tone: "dim", look: "still" },
+    endField: { text: tail(game.end + caret("end"), WIDTH - 7), tone: timeTone(game), look: focused("end") },
+    snipButton: snipButton(game, inTimes),
+    playChip: { text: game.armed ? "[ Pause ]" : "[ Play ]", tone: "card", look: focused("play") },
+    speedChip: { text: `[ ${game.speed.toFixed(2)}x ]`, tone: "card", look: focused("speed") },
+    modeChip: { text: game.mode === "snippet" ? "[ Loop: SNIP ]" : "[ Loop: FULL ]", tone: "card", look: focused("mode") },
     tip: { text: TIP, tone: "gold", look: "still" },
     status: statusOf(game),
     bar: barOf(game),
   };
 }
 
-const speedRow = (pic: Picture): string => `${pic.speedMinus.text}  ${pic.speedValue.text}  ${pic.speedPlus.text}`;
-const chipsRow = (pic: Picture): string => `${pic.playChip.text}     ${pic.modeChip.text}`;
+const chipsRow = (pic: Picture): string => `${pic.playChip.text}  ${pic.speedChip.text}  ${pic.modeChip.text}`;
 
 /** The screen as plain text. The last two lines are the status bar and the hint. */
 export function plain(game: Game): string {
@@ -157,17 +162,16 @@ export function plain(game: Game): string {
     pic.name.text,
     pic.loop.text,
     "",
-    center(speedRow(pic), WIDTH),
-    "",
-    center(chipsRow(pic), WIDTH),
-    "",
+    pic.timesTitle.text,
     pic.startLabel.text + pic.startField.text,
     pic.endLabel.text + pic.endField.text,
     pic.snipButton.text,
     "",
+    center(chipsRow(pic), WIDTH),
+    "",
     center(pic.tip.text, WIDTH),
     center(pic.status, WIDTH),
-    backOf(game),
+    backOf,
   ].join("\n");
 }
 
@@ -189,17 +193,16 @@ export function ansi(game: Game): string {
     ink(pic.name),
     ink(pic.loop),
     "",
-    paint(SGR.gold, center(speedRow(pic), WIDTH)),
-    "",
-    center(`${ink(pic.playChip)}     ${ink(pic.modeChip)}`, WIDTH),
-    "",
+    ink(pic.timesTitle),
     ink(pic.startLabel) + ink(pic.startField),
     ink(pic.endLabel) + ink(pic.endField),
     ink(pic.snipButton),
     "",
+    center(`${ink(pic.playChip)}  ${ink(pic.speedChip)}  ${ink(pic.modeChip)}`, WIDTH),
+    "",
     paint(SGR.gold, center(pic.tip.text, WIDTH)),
   ];
-  return `\x1b[H\x1b[J${lines.join("\n")}\n${paint(BAR[pic.bar], center(pic.status, WIDTH))}\n${paint(SGR.dim, backOf(game))}\n`;
+  return `\x1b[H\x1b[J${lines.join("\n")}\n${paint(BAR[pic.bar], center(pic.status, WIDTH))}\n${paint(SGR.dim, backOf)}\n`;
 }
 
 function esc(text: string): string {
@@ -223,12 +226,11 @@ function centerHtml(html: string, plainText: string, width: number): string {
 export function markup(game: Game): string {
   const pic = picture(game);
   const ink = (piece: Piece) => span(piece.text, piece.tone, piece.look);
-  const speed = centerHtml(
-    `${wrap('data-speed="-"', ink(pic.speedMinus))}  ${ink(pic.speedValue)}  ${wrap('data-speed="+"', ink(pic.speedPlus))}`,
-    speedRow(pic),
+  const chips = centerHtml(
+    `${wrap("data-play", ink(pic.playChip))}  ${wrap("data-speed", ink(pic.speedChip))}  ${wrap("data-mode", ink(pic.modeChip))}`,
+    chipsRow(pic),
     WIDTH,
   );
-  const chips = centerHtml(`${wrap("data-play", ink(pic.playChip))}     ${wrap("data-mode", ink(pic.modeChip))}`, chipsRow(pic), WIDTH);
   return [
     span(center(pic.title.text, WIDTH), pic.title.tone, "still"),
     "",
@@ -239,13 +241,12 @@ export function markup(game: Game): string {
     ink(pic.name),
     `<span class="loop" data-loop>${ink(pic.loop)}</span>`,
     "",
-    speed,
-    "",
-    chips,
-    "",
+    ink(pic.timesTitle),
     ink(pic.startLabel) + wrap('data-field="start"', ink(pic.startField)),
     ink(pic.endLabel) + wrap('data-field="end"', ink(pic.endField)),
     wrap("data-snip", ink(pic.snipButton)),
+    "",
+    chips,
     "",
     span(center(pic.tip.text, WIDTH), pic.tip.tone, "still"),
   ].join("\n");

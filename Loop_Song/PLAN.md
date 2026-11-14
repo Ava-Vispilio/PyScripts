@@ -3,15 +3,15 @@ name: Loop Song TUI
 overview: "A looptube.io-style audio looper, scoped to one video at a time: paste a link, load it, loop the whole thing or a marked snippet, adjust the speed. One screen, one TypeScript engine, a compiled standalone terminal app, and a static GitHub Pages page that plays the audio through the YouTube IFrame API."
 todos:
   - id: engine
-    content: Add the single-screen state machine: URL draft, load pipeline (idle, checking, loaded, not found, bad link), snippet fields with validation, speed steps, loop mode, play arm, reset
+    content: Add the single-screen state machine: six spots on a ring, URL draft with a seal, load pipeline (idle, checking, loaded, not found, bad link), snippet fields with validation and lock, speed cycle, loop mode, play arm, reset
   - id: tests
-    content: Test link parsing, the load transitions the shells drive, snippet validation and clamps, speed steps, mode guards, the loop-URL round-trip
+    content: Test link parsing, the load transitions the shells drive, section locks and unlocks, snippet validation, speed cycling, mode guards, the loop-URL round-trip
   - id: screen
-    content: Add the one screen: typing fields with a block caret, status-colored button rows, the loop row, speed row, play and mode chips, dense tips, the outcome bar
+    content: Add the one screen: section-locked typing fields with a block caret, status-colored button rows, the loop row, play, speed, and mode chips, dense tips, the outcome bar
   - id: tui
-    content: Add the ANSI terminal shell: typing mode per field, the key map, the oEmbed title fetch, launching the loop in the browser, q to quit
+    content: Add the ANSI terminal shell: up/down spot ring, Enter-driven controls, typing rules per spot, the oEmbed title fetch, launching the loop in the browser on the arming edge, Ctrl-C to quit
   - id: web
-    content: Add the static page: small IFrame player, same layout below it, live progress bar, loop seeking, speed control, p to play/pause, loop-URL entry
+    content: Add the static page: small IFrame player, same layout below it, its own oEmbed check, live progress bar, loop seeking, speed control, Enter and click drive the same spots, loop-URL entry
   - id: build
     content: Add the build script: compile the terminal binary to dist/loop-song, bundle the page into docs/ with .nojekyll, ready for GitHub Pages
   - id: pages
@@ -43,12 +43,13 @@ to the browser.
 ```mermaid
 flowchart TD
   empty[Empty form] -->|type, Enter| checking[Checking the link]
-  checking -->|oEmbed resolves| loaded[Loaded, name shown, loop full]
-  checking -->|bad ID or not found| bad[Red bar, draft kept]
-  loaded -->|+/-| speed[Speed steps 0.25x to 2x]
-  loaded -->|type times, Enter| snippet[Snippet confirmed, loop mode on]
-  loaded -->|p| launch[Page opens, audio loops]
-  loaded -->|Esc or r| empty
+  checking -->|oEmbed resolves| loaded[Loaded, name shown, URL sealed, loop full]
+  checking -->|bad ID or not found| bad[Red bar, draft kept, seal off]
+  loaded -->|Enter on speed chip| speed[Speed cycles 0.25x to 2x, wrapping]
+  loaded -->|type times, Enter| snippet[Times locked, loop mode on]
+  snippet -->|Enter again| edit[Times unlocked, window kept]
+  loaded -->|Enter on play chip| launch[Page opens, audio loops]
+  loaded -->|Esc| empty
   bad -->|type| empty2[Draft edited]
 ```
 
@@ -64,106 +65,118 @@ flowchart LR
 ```
 
 - `src/game.ts` is pure: `step(state, action)` returns the next state. One
-  phase, one screen. The state is the URL draft, the load status
-  (`idle | checking | loaded | notFound | badLink`), the video (`videoId`,
-  `title?`), the snippet draft (`start`, `end` as typed strings), the confirmed
-  snippet (seconds), the speed, and the loop mode (`full | snippet`).
-  - Actions: `{ type: "type", ch }` and `backspace` feed the focused field —
+  phase, one screen. The state is the focused spot, the URL draft and its
+  seal, the load status (`idle | checking | loaded | notFound | badLink`),
+  the video (`videoId`, `title?`), the snippet draft (`start`, `end` as typed
+  strings), the confirmed snippet (seconds), the speed, the loop mode
+  (`full | snippet`), and the play arm.
+  - Actions: `{ type: "type", ch }` and `backspace` feed the focused spot —
     the sanctioned exception to data-free actions; `focus` moves between the
-    three fields; `accept` acts on the focused field (load the URL, or confirm
-    the snippet); `titled` and `notFound` are what a shell sends after its
-    oEmbed check; `nudgeSpeed`; `toggleMode` (snippet mode refuses without a
-    confirmed snippet); `arm` (play intent); `restart`.
-  - The engine never fetches and never sleeps: the TUI checks oEmbed between
-    `accept` and `titled`, the same way the Tic Tac Toe shells own the
+    six spots; `accept` is the one Enter: it acts on whatever spot holds the
+    caret (load or unlock the URL, confirm or unlock the times, toggle play,
+    cycle speed, toggle mode); `titled` and `notFound` are what a shell sends
+    after its oEmbed check; `restart`.
+  - Locks gate typing, never focus: a sealed URL and confirmed times stay in
+    the spot ring, because their Enter is the unlock. Unlocking the times
+    keeps the confirmed window — the loop plays on until a new pair confirms.
+  - The engine never fetches and never sleeps: both shells check oEmbed
+    between `accept` and `titled`, the same way the Tic Tac Toe shells own the
     opponent's one-second pause.
 - `src/share.ts` is the loop-URL codec: `encode(state)` builds
   `…/Loop_Song/#v=<id>&s=<start>&e=<end>&z=<speed>&m=<mode>`, `decode` reads it
   back. Round-trip tested. The TUI launches this URL; the page loads it on
   entry.
 - `src/text.ts` paints the one screen. Fixed height, board width 39.
-- `src/tui.ts` writes ANSI and reads keys. On a typing field, printable keys
-  and Backspace edit the draft. On `p` it composes the loop URL and opens it
-  with the OS opener (`open` on macOS — a builtin, not an installable
-  dependency; if you would rather it never spawn anything, `p` prints the URL
-  instead). It fetches the title from YouTube's keyless oEmbed endpoint after
-  `accept`; offline or private videos fall back to the raw videoId.
+- `src/tui.ts` writes ANSI and reads keys. Up and down walk the six spots;
+  Enter acts on the focused one. Enter on the play chip composes the loop URL
+  and opens it with the OS opener (`open` on macOS — a builtin, not an
+  installable dependency; if you would rather it never spawn anything, set
+  `LOOP_SONG_OPEN=0` and it prints the URL instead). It fetches the title from
+  YouTube's keyless oEmbed endpoint after `accept`; offline or private videos
+  fall back to the raw videoId.
 - `src/page.ts` and `index.html` paint the same layout on black with a small
   IFrame player above it (YouTube's terms require a visible player, and
-  browsers need a gesture before sound — the first `p` or click starts it).
-  The page polls `getCurrentTime()` and seeks back to the snippet start when
-  the playhead passes the end. Speed maps to `setPlaybackRate`. The loop row
-  becomes the live progress bar here.
+  browsers need a gesture before sound — the first Enter on Play or click
+  starts it). The page runs the same oEmbed check as the terminal, so a typed
+  URL settles to loaded without the hash. It polls `getCurrentTime()` and
+  seeks back to the snippet start when the playhead passes the end. Speed maps
+  to `setPlaybackRate`. The loop row becomes the live progress bar here.
 
 ## The screen
 
 ```
 LOOP SONG
 
-Video to load
-https://youtu.be/dQw4w9WgXcQ▌
-[ Enter to load ]
+Video to load:
+https://youtu.be/dQw4w9WgXcQ
+[ Enter to choose another song ]
 
 Never Gonna Give You Up · Rick Astley
 Loop: 12.0s → 18.0s (6.0s)
 
--  1.00x  +
+Start / End Timings
+Start: 12
+End:   18
+[ Enter to edit ]
 
-[ P = Play ]     [ Loop: SNIPPET ]
+[ Play ]  [ 1.00x ]  [ Loop: SNIP ]
 
-Start Timing: 12
-End Timing:   18
-[ Enter to confirm ]
-
-P = Play, +/- = Speed, M = Mode
-             Loaded
-Esc = Reset, Q = Quit
+↑↓ = Move, Enter = Select, Esc = Reset
+              Snippet set
+Esc = Reset, Ctrl-C = Quit
 ```
 
-- **Three typing fields** — URL, Start, End — with a block caret on the focused
-  one. Arrows move between them. Enter acts on the focused field, and the
-  matching button row takes its status color.
-- **The load button** carries the pipeline: dim `[ Enter to load ]` when idle,
-  yellow while checking, green `[ Loaded ]` on success, red `[ Bad link ]` or
-  `[ Not found ]` on failure, with the draft kept for editing.
+- **Six spots, three of them typing fields.** Up and down walk the ring —
+  URL, Start, End, Play, Speed, Mode — and the focused piece renders hot.
+  The video name and the loop row are display only and never take the caret.
+- **Section locks.** A good load seals the URL: the field stops typing, the
+  button reads `[ Enter to choose another song ]`, and Enter on the URL
+  unlocks it again. The times lock the same way — Enter confirms, Enter
+  again unlocks for editing while the confirmed window keeps looping. An
+  empty pair ignores Enter rather than flashing red.
+- **The load button** carries the pipeline: dim `[ Enter to load ]` when
+  idle, yellow while checking, card `[ Enter to choose another song ]` once
+  loaded and sealed, red `[ Bad link ]` or `[ Not found ]` on failure, with
+  the draft kept for editing.
 - **The loop row** is honest per shell. The TUI shows the confirmed window as
   text — it cannot know the duration, so it draws no bar. The page draws the
   live bar: full-video track, snippet window lit, playhead pip inside it.
-- **Speed** nudges in YouTube's steps (0.25x to 2x) on `+` and `-`, shown
-  between the signs.
-- **Play and mode chips.** `[ P = Play ]` launches the loop (TUI) or toggles
-  the player (page). `[ Loop: FULL | SNIPPET ]` is the highlighted mode, cycled
-  by `m`, refused in snippet mode until times are confirmed.
-- **Snippet section.** Times are typed in seconds, confirmed with Enter,
-  validated as `0 ≤ start < end` (against the real duration on the page).
-  Until a video loads the section sits dim.
+- **Chips.** `[ Play | Pause ]` launches the loop (TUI, only on the arming
+  edge) or toggles the player (page). `[ 1.00x ]` cycles YouTube's speed
+  steps (0.25x to 2x, wrapping). `[ Loop: FULL | SNIP ]` toggles the mode,
+  refused in snippet mode until times are confirmed. Enter on a focused chip
+  is the only way in.
+- **Snippet section.** Times are typed in seconds — digits and a dot are the
+  only keys the fields take — confirmed with Enter, validated as
+  `0 ≤ start < end` (against the real duration on the page). Until a video
+  loads the section sits dim.
 
 ## Key map
 
 One map across both shells (guideline 25), dense hints on screen (guideline 26).
+No letter commands remain: every action is an arrow or an Enter, so no field
+  can shadow a key.
 
 | Key | Acts |
 | --- | --- |
-| Arrows | move between the URL, Start, and End fields |
-| Enter | load the URL / confirm the snippet (focused field decides) |
-| `+` `-` | nudge the speed |
-| `P` | play — launch on TUI, play/pause on the page |
-| `M` | cycle the loop mode |
-| `R` / Esc | reset to the empty form (no parent screen to go back to) |
-| `Q` | quit |
+| ↑ ↓ | move between the six spots (URL, Start, End, Play, Speed, Mode) |
+| Enter | act on the focused spot: load/unlock the URL, confirm/unlock the times, toggle play, cycle speed, toggle mode |
+| ← → | nothing |
+| Esc | reset to the empty form |
+| Ctrl-C | quit (terminal only) |
 
-On the page, clicks mirror the keys (guideline 33). A `#v=…` hash on entry
-loads a shared loop straight into the loaded state.
+On the page, clicks mirror the keys (guideline 33): a click focuses its spot
+first, then sends the same Enter. A `#v=…` hash on entry loads a shared loop
+straight into the loaded state.
 
 ## Colors
 
 - Title gold, the repo standard.
 - The URL field cyan, Start and End orange, matching the repo's two-endpoints
-  pairing from Tic Tac Toe. Speed yellow.
-- The focused field renders dark text on its color; button rows take their
-  status color (dim, yellow, green, red).
-- The mode chip is hot when it differs from the default, the play chip hot
-  when armed.
+  pairing from Tic Tac Toe.
+- The focused spot renders dark text on its color; button rows take their
+  status color (dim, yellow, green, red) and run hot while their section
+  holds the caret.
 - The bar carries the outcome (guideline 29): yellow `Type a link` or
   `Checking`, green `Loaded` or `Snippet set`, red `Bad link` or `Not found`.
 
@@ -173,19 +186,25 @@ Flagged for the next distillation round:
 
 1. **Typing screens.** The engine owns the drafts and the caret; shells forward
    printables. Action types carry data here and nowhere else.
-2. **Read-only network in a shell.** The TUI's oEmbed title check is one
-   keyless GET, sent back into the engine as an action, like the Tic Tac Toe
-   timer. The engine stays pure.
+2. **Read-only network in a shell.** The oEmbed title check is one keyless
+   GET, sent back into the engine as an action, like the Tic Tac Toe
+   timer. The engine stays pure. Both shells run it — the page cannot lean
+   on the hash path alone.
 3. **Shell-crossing by URL.** The TUI hands a loop to the browser as a composed
    URL — no shared process state, the codec is the contract.
+4. **Section locks.** A confirmed section seals itself and unlocks on Enter.
+   Locks gate typing, never focus: the ring must always reach the unlock.
 
 ## Verify
 
 `tsc --noEmit`, then `bun test`. Drive the terminal binary through a real pty:
-type a URL, load it, watch the title arrive, type and confirm a snippet, nudge
-the speed, cycle the mode, reset with Esc, quit. Serve the page on 127.0.0.1
-and check by hand: a real embed loads, the loop seeks at the snippet end, `p`
-and speed work, a `#v=…` hash lands loaded. Stop the server after.
+type a URL, load it, watch the title arrive and the seal close, arrow down
+through all six spots, type and confirm a snippet, Enter again to unlock it,
+cycle the speed chip, toggle the mode chip, Enter on Play and watch the browser
+take the loop, reset with Esc, quit. Serve the page on 127.0.0.1 and check by
+hand: a typed URL settles to loaded through the page's own oEmbed check, the
+loop seeks at the snippet end, the chips work by Enter and by click, a `#v=…`
+hash lands loaded. Stop the server after.
 
 ## Build and deploy
 

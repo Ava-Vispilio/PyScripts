@@ -1,4 +1,4 @@
-import { newGame, nudgeField, stage, step, type Action, type Dir, type Game } from "./game";
+import { newGame, nudgeSpot, stage, step, type Action, type Game } from "./game";
 import { decode, open } from "./share";
 import { backOf, markup, statusOf, barOf } from "./text";
 
@@ -34,8 +34,6 @@ let apiReady = false;
 let loadedId: string | null = null;
 let lastSpeed = 1;
 
-const ARROWS: Record<string, Dir> = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" };
-
 function opened(): Game {
   const name = new URLSearchParams(location.search).get("state");
   if (name && stage(name)) return stage(name)!;
@@ -50,7 +48,7 @@ function draw() {
   board.innerHTML = markup(game);
   bar.textContent = statusOf(game);
   bar.className = barOf(game);
-  back.textContent = backOf(game);
+  back.textContent = backOf;
 }
 
 function act(action: Action) {
@@ -104,6 +102,29 @@ function applySettings() {
   else player.seekTo(0, true);
 }
 
+/**
+ * The typed-URL path needs its own title check: the hash path settles through
+ * `open()`, but a URL keyed into the page stops at "checking" unless the page
+ * fetches oEmbed itself, exactly like the terminal shell.
+ */
+async function check() {
+  const id = game.videoId;
+  if (game.load !== "checking" || !id) return;
+  const target = `https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${id}`)}&format=json`;
+  let action: Action = { type: "titled", title: id };
+  try {
+    const res = await fetch(target);
+    if (res.status === 404) action = { type: "notFound" };
+    else if (res.ok) {
+      const data = (await res.json()) as { title?: unknown };
+      if (typeof data.title === "string" && data.title) action = { type: "titled", title: data.title };
+    }
+  } catch {
+    // offline: keep the videoId fallback
+  }
+  if (game.load === "checking" && game.videoId === id) act(action);
+}
+
 /** The loop row becomes the live bar here: track, snippet window, played span, playhead. */
 function drawLoop(t: number, d: number) {
   const loopEl = document.querySelector("[data-loop]");
@@ -139,13 +160,20 @@ setInterval(() => {
   if (title && title !== game.title) act({ type: "titled", title });
 }, 250);
 
+/** Enter or click on the play chip toggles the player, mirroring the armed flag. */
 function play() {
   if (game.load !== "loaded") return;
-  act({ type: "arm" });
+  act({ type: "accept" });
   if (player && playerReady) {
     if (player.getPlayerState() === 1) player.pauseVideo();
     else player.playVideo();
   }
+}
+
+/** Enter off the play chip acts on the focused spot, and a live check gets its fetch. */
+function enter() {
+  act({ type: "accept" });
+  if (game.load === "checking") void check();
 }
 
 draw();
@@ -158,17 +186,19 @@ document.head.appendChild(tag);
   syncPlayer();
 };
 
+const DIGIT = /^[\d.]$/;
+
 document.addEventListener("keydown", (event) => {
   if (event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
-  const dir = ARROWS[event.key];
-  if (dir) {
+  if (event.key === "ArrowUp" || event.key === "ArrowDown") {
     event.preventDefault();
-    act({ type: "focus", field: nudgeField(game.focus, dir === "down" || dir === "right" ? 1 : -1) });
+    act({ type: "focus", spot: nudgeSpot(game.focus, event.key === "ArrowDown" ? 1 : -1) });
     return;
   }
   if (event.key === "Enter") {
     event.preventDefault();
-    act({ type: "accept" });
+    if (game.focus === "play") play();
+    else enter();
     return;
   }
   if (event.key === "Backspace") {
@@ -181,73 +211,52 @@ document.addEventListener("keydown", (event) => {
     act({ type: "restart" });
     return;
   }
-  // The URL field types every printable; the letter commands live in the time
-  // fields, matching the terminal shell's key map.
-  if (game.focus === "url") {
-    if (event.key.length === 1) {
-      event.preventDefault();
-      act({ type: "type", ch: event.key });
-    }
-    return;
-  }
-  if (event.key === "r" || event.key === "R") {
+  // Typing follows the spot, matching the terminal shell's key map: the URL
+  // takes every printable, the time fields take digits and a dot, the chips
+  // take nothing.
+  if (game.focus === "url" && event.key.length === 1) {
     event.preventDefault();
-    act({ type: "restart" });
+    act({ type: "type", ch: event.key });
     return;
   }
-  if (event.key === "p" || event.key === "P") {
-    event.preventDefault();
-    play();
-    return;
-  }
-  if (event.key === "m" || event.key === "M") {
-    event.preventDefault();
-    act({ type: "toggleMode" });
-    return;
-  }
-  if (event.key === "+" || event.key === "=") {
-    event.preventDefault();
-    act({ type: "faster" });
-    return;
-  }
-  if (event.key === "-") {
-    event.preventDefault();
-    act({ type: "slower" });
-    return;
-  }
-  if (event.key.length === 1) {
+  if ((game.focus === "start" || game.focus === "end") && DIGIT.test(event.key)) {
     event.preventDefault();
     act({ type: "type", ch: event.key });
   }
 });
 
+/** Clicks land as focus first, then the same Enter the keyboard would send. */
 document.addEventListener("click", (event) => {
   if (!(event.target instanceof Element)) return;
   const field = event.target.closest("[data-field]");
   if (field instanceof HTMLElement) {
-    act({ type: "focus", field: field.dataset.field as typeof game.focus });
+    act({ type: "focus", spot: field.dataset.field as typeof game.focus });
     return;
   }
   if (event.target.closest("[data-load]")) {
-    act({ type: "focus", field: "url" });
-    act({ type: "accept" });
+    act({ type: "focus", spot: "url" });
+    enter();
     return;
   }
   if (event.target.closest("[data-snip]")) {
-    act({ type: "focus", field: "end" });
+    act({ type: "focus", spot: "end" });
     act({ type: "accept" });
     return;
   }
-  const speed = event.target.closest("[data-speed]");
-  if (speed instanceof HTMLElement) {
-    act({ type: speed.dataset.speed === "+" ? "faster" : "slower" });
-    return;
-  }
   if (event.target.closest("[data-play]")) {
+    act({ type: "focus", spot: "play" });
     play();
     return;
   }
-  if (event.target.closest("[data-mode]")) act({ type: "toggleMode" });
+  if (event.target.closest("[data-speed]")) {
+    act({ type: "focus", spot: "speed" });
+    act({ type: "accept" });
+    return;
+  }
+  if (event.target.closest("[data-mode]")) {
+    act({ type: "focus", spot: "mode" });
+    act({ type: "accept" });
+  }
 });
 
 (window as unknown as { loopState: (name: string) => void }).loopState = (name) => {

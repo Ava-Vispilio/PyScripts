@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
+  cycleSpeed,
   newGame,
-  nudgeField,
-  nudgeSpeed,
+  nudgeSpot,
   SPEEDS,
   stage,
   step,
@@ -39,9 +39,13 @@ describe("the load pipeline", () => {
     expect(step(newGame(), { type: "accept" })).toEqual(newGame());
   });
 
-  test("a good accept hands the caret to the snippet fields, a bad one keeps it", () => {
-    expect(load("https://youtu.be/dQw4w9WgXcQ").focus).toBe("start");
-    expect(step(typeAll(newGame(), "nope"), { type: "accept" }).focus).toBe("url");
+  test("a good accept seals the URL and hands the caret to the times, a bad one keeps both", () => {
+    const good = load("https://youtu.be/dQw4w9WgXcQ");
+    expect(good.focus).toBe("start");
+    expect(good.urlLocked).toBe(true);
+    const bad = step(typeAll(newGame(), "nope"), { type: "accept" });
+    expect(bad.focus).toBe("url");
+    expect(bad.urlLocked).toBe(false);
   });
 
   test("a parseable link enters checking with the old video cleared", () => {
@@ -83,6 +87,31 @@ describe("the load pipeline", () => {
   });
 });
 
+describe("the URL seal", () => {
+  test("a sealed URL refuses the keys until Enter unlocks it", () => {
+    let game = stage("loaded")!;
+    game = step(game, { type: "focus", spot: "url" });
+    expect(step(game, { type: "type", ch: "x" })).toBe(game);
+    expect(step(game, { type: "backspace" })).toBe(game);
+    const unlocked = step(game, { type: "accept" });
+    expect(unlocked.urlLocked).toBe(false);
+    expect(unlocked.load).toBe("loaded");
+    expect(unlocked.videoId).toBe("dQw4w9WgXcQ");
+    expect(unlocked.title).toBe("Test Video");
+    expect(step(unlocked, { type: "backspace" }).url).toBe("https://youtu.be/dQw4w9WgXc");
+  });
+
+  test("Enter on an unlocked loaded URL starts a fresh check", () => {
+    let game = stage("loaded")!;
+    game = step(game, { type: "focus", spot: "url" });
+    game = step(game, { type: "accept" });
+    const rechecked = step(game, { type: "accept" });
+    expect(rechecked.load).toBe("checking");
+    expect(rechecked.urlLocked).toBe(true);
+    expect(rechecked.focus).toBe("start");
+  });
+});
+
 describe("typing", () => {
   test("printables land in the focused field, backspace removes", () => {
     let game = newGame();
@@ -106,12 +135,12 @@ describe("typing", () => {
     expect(edited.url).toBe("nope!");
   });
 
-  test("editing a set snippet unsets it and returns to full loop", () => {
-    const snippet = stage("snippet")!;
-    const edited = step(snippet, { type: "backspace" });
-    expect(edited.snip).toBe("empty");
-    expect(edited.window).toBeNull();
-    expect(edited.mode).toBe("full");
+  test("the chips never type", () => {
+    for (const spot of ["play", "speed", "mode"] as const) {
+      let game = step(stage("loaded")!, { type: "focus", spot });
+      expect(step(game, { type: "type", ch: "5" })).toBe(game);
+      expect(step(game, { type: "backspace" })).toBe(game);
+    }
   });
 
   test("only single printable characters type", () => {
@@ -132,63 +161,107 @@ describe("the snippet", () => {
   test("start must sit before end", () => {
     expect(stage("badtimes")!.snip).toBe("bad");
     let game = stage("loaded")!;
-    game = typeAll(step(game, { type: "focus", field: "start" }), "18");
-    game = typeAll(step(game, { type: "focus", field: "end" }), "18");
+    game = typeAll(step(game, { type: "focus", spot: "start" }), "18");
+    game = typeAll(step(game, { type: "focus", spot: "end" }), "18");
     expect(step(game, { type: "accept" }).snip).toBe("bad");
   });
 
   test("decimals parse, garbage does not", () => {
     let game = stage("loaded")!;
-    game = typeAll(step(game, { type: "focus", field: "start" }), "12.5");
-    game = typeAll(step(game, { type: "focus", field: "end" }), "18");
+    game = typeAll(step(game, { type: "focus", spot: "start" }), "12.5");
+    game = typeAll(step(game, { type: "focus", spot: "end" }), "18");
     expect(step(game, { type: "accept" }).window).toEqual([12.5, 18]);
     game = stage("loaded")!;
-    game = typeAll(step(game, { type: "focus", field: "start" }), "1:30");
-    game = typeAll(step(game, { type: "focus", field: "end" }), "18");
+    game = typeAll(step(game, { type: "focus", spot: "start" }), "1:30");
+    game = typeAll(step(game, { type: "focus", spot: "end" }), "18");
     expect(step(game, { type: "accept" }).snip).toBe("bad");
   });
 
   test("times confirm only against a loaded video", () => {
-    let game = typeAll(newGame(), "12");
+    let game = newGame();
+    game = typeAll(step(game, { type: "focus", spot: "start" }), "12");
+    game = typeAll(step(game, { type: "focus", spot: "end" }), "18");
     expect(step(game, { type: "accept" }).snip).toBe("empty");
+  });
+
+  test("Enter on an empty pair is a no-op, not a red bar", () => {
+    const loaded = stage("loaded")!;
+    expect(step(loaded, { type: "accept" })).toBe(loaded);
+  });
+
+  test("locked times refuse the keys, and Enter unlocks while keeping the window", () => {
+    const snippet = stage("snippet")!;
+    const locked = step(snippet, { type: "type", ch: "9" });
+    expect(locked).toBe(snippet);
+    const unlocked = step(snippet, { type: "accept" });
+    expect(unlocked.snip).toBe("empty");
+    expect(unlocked.window).toEqual([12, 18]);
+    expect(unlocked.mode).toBe("snippet");
+    const relocked = step(unlocked, { type: "accept" });
+    expect(relocked.snip).toBe("set");
+    expect(relocked.window).toEqual([12, 18]);
+  });
+
+  test("editing a bad pair returns it to neutral", () => {
+    const bad = stage("badtimes")!;
+    const edited = step(bad, { type: "backspace" });
+    expect(edited.snip).toBe("empty");
+    expect(edited.end).toBe("1");
   });
 });
 
-describe("speed and mode", () => {
-  test("speed steps run 0.25x to 2x and clamp at both ends", () => {
-    let game = stage("loaded")!;
-    for (let i = 0; i < 10; i++) game = step(game, { type: "faster" });
-    expect(game.speed).toBe(2);
-    for (let i = 0; i < 12; i++) game = step(game, { type: "slower" });
+describe("speed, mode, and play", () => {
+  test("cycleSpeed wraps at both ends", () => {
+    expect(cycleSpeed(2)).toBe(0.25);
+    expect(cycleSpeed(0.25)).toBe(0.5);
+    expect(cycleSpeed(1)).toBe(1.25);
+    expect(SPEEDS as readonly number[]).toContain(cycleSpeed(3.7));
+  });
+
+  test("Enter on the speed chip cycles through the steps", () => {
+    let game = step(stage("loaded")!, { type: "focus", spot: "speed" });
+    for (let i = 0; i < 5; i++) game = step(game, { type: "accept" });
+    expect(game.speed).toBe(0.25);
+    game = step(game, { type: "accept" });
+    expect(game.speed).toBe(0.5);
+    for (let i = 0; i < 7; i++) game = step(game, { type: "accept" });
     expect(game.speed).toBe(0.25);
   });
 
-  test("nudgeSpeed clamps through the same steps", () => {
-    expect(nudgeSpeed(2, 1)).toBe(2);
-    expect(nudgeSpeed(0.25, -1)).toBe(0.25);
-    expect(nudgeSpeed(1, 1)).toBe(1.25);
-    expect(nudgeSpeed(1, -1)).toBe(0.75);
-    expect(SPEEDS as readonly number[]).toContain(nudgeSpeed(3.7, 1));
-  });
-
   test("snippet mode refuses without a confirmed window", () => {
-    expect(step(stage("loaded")!, { type: "toggleMode" }).mode).toBe("full");
-    expect(step(stage("snippet")!, { type: "toggleMode" }).mode).toBe("full");
-    expect(step(stage("snippet")!, { type: "toggleMode" })).not.toBe(stage("snippet")!);
+    const loaded = step(stage("loaded")!, { type: "focus", spot: "mode" });
+    expect(step(loaded, { type: "accept" }).mode).toBe("full");
   });
 
-  test("the mode chip arms only against a loaded video", () => {
-    expect(step(newGame(), { type: "arm" }).armed).toBe(false);
-    expect(step(stage("loaded")!, { type: "arm" }).armed).toBe(true);
+  test("Enter on the mode chip toggles, and a window keeps it reachable", () => {
+    let game = step(stage("snippet")!, { type: "focus", spot: "mode" });
+    game = step(game, { type: "accept" });
+    expect(game.mode).toBe("full");
+    expect(game.window).toEqual([12, 18]);
+    game = step(game, { type: "accept" });
+    expect(game.mode).toBe("snippet");
+  });
+
+  test("Enter on the play chip toggles the arm, only against a loaded video", () => {
+    let game = step(newGame(), { type: "focus", spot: "play" });
+    expect(step(game, { type: "accept" }).armed).toBe(false);
+    game = step(stage("loaded")!, { type: "focus", spot: "play" });
+    game = step(game, { type: "accept" });
+    expect(game.armed).toBe(true);
+    game = step(game, { type: "accept" });
+    expect(game.armed).toBe(false);
   });
 });
 
-describe("fields and reset", () => {
-  test("the field ring visits url, start, end", () => {
-    expect(nudgeField("url", 1)).toBe("start");
-    expect(nudgeField("start", 1)).toBe("end");
-    expect(nudgeField("end", 1)).toBe("url");
-    expect(nudgeField("url", -1)).toBe("end");
+describe("spots and reset", () => {
+  test("the spot ring visits all six, wrapping both ways", () => {
+    expect(nudgeSpot("url", 1)).toBe("start");
+    expect(nudgeSpot("start", 1)).toBe("end");
+    expect(nudgeSpot("end", 1)).toBe("play");
+    expect(nudgeSpot("play", 1)).toBe("speed");
+    expect(nudgeSpot("speed", 1)).toBe("mode");
+    expect(nudgeSpot("mode", 1)).toBe("url");
+    expect(nudgeSpot("url", -1)).toBe("mode");
   });
 
   test("restart returns a fresh form from anywhere", () => {
@@ -201,6 +274,7 @@ describe("fields and reset", () => {
     expect(stage("checking")!.load).toBe("checking");
     expect(stage("loaded")!.load).toBe("loaded");
     expect(stage("snippet")!.mode).toBe("snippet");
+    expect(stage("snippet")!.urlLocked).toBe(true);
     expect(stage("bad")!.load).toBe("badLink");
     expect(stage("notfound")!.load).toBe("notFound");
     expect(stage("badtimes")!.snip).toBe("bad");
