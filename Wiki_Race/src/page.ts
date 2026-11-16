@@ -41,6 +41,8 @@ function stopTick() {
 
 type SetupUi = { button: HTMLButtonElement; note: HTMLSpanElement };
 
+let setupUi: SetupUi | null = null;
+
 function paintSetup(opts: { start?: string; end?: string } = {}): SetupUi {
   frame = null;
   statsLine = backBtn = hopsSpan = timeSpan = noteEl = null;
@@ -79,6 +81,7 @@ function paintSetup(opts: { start?: string; end?: string } = {}): SetupUi {
     void beginRace(startInput.value.trim(), endInput.value.trim(), ui);
   });
   main.append(form);
+  setupUi = ui;
   return ui;
 }
 
@@ -308,3 +311,12 @@ document.addEventListener("keydown", backKey);
 const fromHash = decode(location.hash);
 const ui = paintSetup(fromHash ? { start: fromHash.start, end: fromHash.end } : {});
 if (fromHash) void beginRace(fromHash.start, fromHash.end, ui);
+
+// Pasting a race URL into an already-open tab is a same-document navigation —
+// the page never reloads, so the hash has to be watched.
+window.addEventListener("hashchange", () => {
+  const race = decode(location.hash);
+  if (!race || !setupUi) return;
+  reset();
+  void beginRace(race.start, race.end, setupUi);
+});
