@@ -1,4 +1,4 @@
-import { current, hops, initial, step, type State } from "./game";
+import { current, hops, initial, step, HOP_CAP, type State } from "./game";
 import { decode, encode } from "./share";
 import { classify, fetchArticle, prepare, type Article } from "./wiki";
 
@@ -13,6 +13,7 @@ let backBtn: HTMLButtonElement | null = null;
 let hopsSpan: HTMLSpanElement | null = null;
 let timeSpan: HTMLSpanElement | null = null;
 let noteEl: HTMLSpanElement | null = null;
+let pathLine: HTMLParagraphElement | null = null;
 
 // Every navigation (follow, back, reset, new race) bumps this; an async fetch
 // whose seq no longer matches is stale and must not paint or dispatch.
@@ -63,7 +64,7 @@ let setupUi: SetupUi | null = null;
 
 function paintSetup(opts: { start?: string; end?: string } = {}): SetupUi {
   frame = null;
-  statsLine = backBtn = hopsSpan = timeSpan = noteEl = null;
+  statsLine = backBtn = hopsSpan = timeSpan = noteEl = pathLine = null;
   raceEl.textContent = "";
   main.replaceChildren();
 
@@ -160,10 +161,13 @@ function paintRace() {
   noteEl.className = "note";
   statsLine.append(backBtn, " ", hopsSpan, " ", timeSpan, " ", noteEl);
 
+  pathLine = document.createElement("p");
+  pathLine.className = "path";
+
   frame = document.createElement("iframe");
   frame.title = "Wikipedia article";
 
-  main.append(statsLine, frame);
+  main.append(statsLine, pathLine, frame);
   paintStats();
   void showArticle(state.start);
 }
@@ -247,8 +251,21 @@ function reset() {
 function paintStats() {
   if (!statsLine || !backBtn || !hopsSpan) return;
   backBtn.disabled = state.phase !== "racing" || state.path.length <= 1;
-  hopsSpan.textContent = `Hops: ${hops(state)}`;
+  hopsSpan.textContent = `Hops: ${hops(state)}/${HOP_CAP}`;
+  paintPath();
   paintTime();
+}
+
+// Full route on one line; once it outgrows the window, keep the newest hops
+// (the head is where the player has already been — the tail is the reference).
+function paintPath() {
+  if (!pathLine) return;
+  const items = [...state.path];
+  pathLine.textContent = items.join(" → ");
+  while (pathLine.scrollWidth > pathLine.clientWidth && items.length > 2) {
+    items.shift();
+    pathLine.textContent = `… ${items.join(" → ")}`;
+  }
 }
 
 function paintTime() {
