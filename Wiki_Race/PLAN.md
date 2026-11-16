@@ -3,17 +3,23 @@ name: Wiki Race
 overview: "A static speedrun over Wikipedia: one player picks a start and an end article and shares the race link, both players load it, and each races from start to end by clicking article links only. One TypeScript engine, one page, no terminal app."
 todos:
   - id: engine
-    content: Add the state machine: setup, racing, and won phases; follow appends to the path, back pops it, hop count derived from path length, win when the canonical title equals the end — reset is not an action, the page just starts a fresh state
+    content: Add the state machine: setup, racing, won, and lost phases; follow appends to the path, back pops it, hop count derived from path length with a 50-hop cap, win when the canonical title equals the end, lost on the cap hop when it is not the end — reset is not an action, the page just starts a fresh state
+    status: completed
   - id: tests
-    content: Test follow, back, and win transitions, dead actions (follow while won, back at the start), title normalization, the race-URL codec round-trip, and that only the first follow arms the timer
+    content: Test follow, back, and win transitions, lost on the cap hop unless it is the end page, dead actions (follow while won or lost, back at the start), title normalization, link classification and prepare, the race-URL codec round-trip, and that only the first follow arms the timer
+    status: completed
   - id: wiki
-    content: Add the Wikipedia layer: fetch articles through the REST page/html API with anonymous CORS, read the canonical title off the redirect, and classify link hrefs (article, in-page, dead)
+    content: Add the Wikipedia layer: fetch articles through the REST page/html API with anonymous CORS, read the canonical title off the redirect, classify link hrefs (article, in-page, dead), and prepare the HTML for the window (strip scripts, handlers, targets, and base; absolutize URLs; lazy images)
+    status: completed
   - id: page
-    content: Add the page: the setup form, the article window with Back, the hop and time stats, the win screen with a copyable result, a Reset button that clears everything, and races that load straight from the hash
+    content: Add the page: the setup form, the article window with Back, the hop and time stats (clock paused during fetches) and the Path line, the win screen with a copyable result, the lost screen, a Reset button that clears everything, and races that load straight from the hash
+    status: completed
   - id: build
     content: Add the build script: bundle the page into docs/ with .nojekyll, ready for GitHub Pages — no terminal binary this time
+    status: completed
   - id: pages
     content: Add Wiki_Race to the Pages workflow folder list and the site index
+    status: completed
 isProject: false
 ---
 
