@@ -4,18 +4,25 @@ overview: "A looptube.io-style audio looper, scoped to one video at a time: past
 todos:
   - id: engine
     content: Add the single-screen state machine: six spots on a ring, URL draft with a seal, load pipeline (idle, checking, loaded, not found, bad link), snippet fields with validation and lock, speed cycle, loop mode, play arm, reset
+    status: completed
   - id: tests
     content: Test link parsing, the load transitions the shells drive, section locks and unlocks, snippet validation, speed cycling, mode guards, the loop-URL round-trip
+    status: completed
   - id: screen
     content: Add the one screen: section-locked typing fields with a block caret, state-colored buttons that say what Enter does, the loop row, play, speed, and mode chips above the timings, dense tips
+    status: completed
   - id: tui
     content: Add the ANSI terminal shell: up/down jump between sections, left/right walk within one, Enter-driven controls, typing rules per spot, the oEmbed title fetch, launching the loop in the browser on the arming edge, Ctrl-C to quit
+    status: completed
   - id: web
     content: Add the static page: small IFrame player, same layout below it, its own oEmbed check, live progress bar, loop seeking, speed control, Enter and click drive the same spots, loop-URL entry
+    status: completed
   - id: build
     content: Add the build script: compile the terminal binary to dist/loop-song, bundle the page into docs/ with .nojekyll, ready for GitHub Pages
+    status: completed
   - id: pages
     content: Add Loop_Song to the Pages workflow folder list and the site index
+    status: completed
 isProject: false
 ---
 
