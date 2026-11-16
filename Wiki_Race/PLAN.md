@@ -3,13 +3,13 @@ name: Wiki Race
 overview: "A static speedrun over Wikipedia: one player picks a start and an end article and shares the race link, both players load it, and each races from start to end by clicking article links only. One TypeScript engine, one page, no terminal app."
 todos:
   - id: engine
-    content: Add the state machine: setup, racing, and won phases; follow appends to the path, back pops it, hop count derived from the path length, win when the canonical title equals the end title, restart back to setup
+    content: Add the state machine: setup, racing, and won phases; follow appends to the path, back pops it, hop count derived from path length, win when the canonical title equals the end — reset is not an action, the page just starts a fresh state
   - id: tests
     content: Test follow, back, and win transitions, dead actions (follow while won, back at the start), title normalization, the race-URL codec round-trip, and that only the first follow arms the timer
   - id: wiki
     content: Add the Wikipedia layer: fetch articles through the REST page/html API with anonymous CORS, read the canonical title off the redirect, and classify link hrefs (article, in-page, dead)
   - id: page
-    content: Add the page: the setup form, the article window with Back, the hop and time stats, the win screen with a copyable result, and races that load straight from the hash
+    content: Add the page: the setup form, the article window with Back, the hop and time stats, the win screen with a copyable result, a Reset button that clears everything, and races that load straight from the hash
   - id: build
     content: Add the build script: bundle the page into docs/ with .nojekyll, ready for GitHub Pages — no terminal binary this time
   - id: pages
@@ -22,9 +22,10 @@ isProject: false
 A Wikipedia speedrun. One player picks a start and an end article and shares the
 race link; both players load it and click from the start article to the end
 article as fast as they can. Fewest hops and fastest time win, compared by
-pasting the result line — no server, no accounts. The web rules in
-[`../Dragon_Link/Guidelines_v1.md`](../Dragon_Link/Guidelines_v1.md) apply; the
-terminal rules do not. This game has no TUI, no `dist/` binary, and one shell.
+pasting the result line — no server, no accounts. This page stands alone: no
+rules from [`../Dragon_Link/Guidelines_v1.md`](../Dragon_Link/Guidelines_v1.md)
+apply, terminal or web. No TUI, no `dist/` binary, one shell, and the barebones
+page is the entire point.
 
 **Decision carried from planning: the window renders fetched HTML, not a live
 Wikipedia iframe.** Two walls block the iframe: Wikipedia sends
@@ -51,8 +52,8 @@ flowchart TD
   hop -->|title is the end| won[Won: clock stopped, result line]
   racing -->|Back, path longer than one| back[Path shrinks]
   back --> racing
-  racing -->|Esc| setup
-  won -->|New race| setup
+  racing -->|Reset| setup
+  won -->|Reset| setup
 ```
 
 ## Shape
@@ -73,7 +74,9 @@ flowchart LR
   - Actions: `{ type: "start", start, end }`; `{ type: "follow", title }` — the
     one data-carrying action, validated in `step` like Tic Tac Toe's cell: a
     follow outside racing returns the same state. `back` pops the path and is a
-    no-op at path length one. `restart` returns to setup.
+    no-op at path length one. There is no reset action — Reset is a page
+    button that throws the state away and starts from the initial one, hash
+    cleared: a reload in place.
   - **The hop count is `path.length − 1`, derived, never stored** (the Tic Tac
     Toe turn rule). **The win check runs on every follow.**
   - The engine never fetches and never sees a timestamp. The shell records the
@@ -96,8 +99,10 @@ flowchart LR
   `…/Wiki_Race/#s=<start>&e=<end>`, `decode` reads it back. Round-trip tested.
   A hash on entry starts the race cold — that is how two players load the same
   start page with zero coordination and no server.
-- `src/page.ts` and `index.html` paint the page: black, monospace, gold title,
-  the repo standard.
+- `src/page.ts` and `index.html` paint a barebones page: a header line with
+  the race and a Reset button, a stats line with Back, Hops, and Time, and the
+  window filling the rest. Default browser styling — the only styled thing on
+  the page is Wikipedia's own article.
   - **The window is an iframe whose `srcdoc` is the fetched article.** A srcdoc
     frame inherits our origin, so the page rewrites its anchors and listens to
     clicks directly. Before injection: strip every `<script>`, `on*` attribute,
@@ -120,7 +125,7 @@ flowchart LR
 ## The screen
 
 ```
-WIKI RACE                          Earth → Nation
+WIKI RACE                   Earth → Nation        [ Reset ]
 
 [ ← Back ]                    Hops: 3    Time: 01:12
 
@@ -150,13 +155,16 @@ Won:
 WIKI RACE                          Earth → Nation
 
 Nation reached in 4 hops and 02:35
-[ Copy result ]   [ New race ]
+[ Copy result ]
 ```
 
 - **Back un-travels.** It pops the path and the hop count drops by one: hops
   measure the distance from the start along the current path, which is what
   "fewest redirects" means. (Flagged as a decision — if Back should cost a hop
   instead, it is a one-line change.)
+- **Reset clears everything.** One button in the header, always present: the
+  race, the path, the clock, and the hash all go, and the setup form returns —
+  the same state a fresh load without a hash gives.
 - **The clock starts on the first article click**, not on load, so both players
   can load the race link, read the start page, and go when they are ready.
 - **Only article links navigate.** Blue links live; red links, external links,
@@ -168,8 +176,9 @@ Nation reached in 4 hops and 02:35
 
 ## Keys
 
-Clicks are the interface. `Backspace` = Back (guarded against `event.repeat`),
-`Esc` = back to setup — the repo key map, cut down for a web-only game.
+Clicks are the interface. `Backspace` = Back (guarded against `event.repeat`)
+is the one shortcut — a speedrun wants fast backpedaling — listened for in
+both the page and the window, which is same-origin srcdoc.
 
 ## Verify
 
@@ -178,7 +187,9 @@ hand: create Earth → Nation, watch the timer arm on the first click and not
 before, hop through articles, win and copy the result, Back and watch the hop
 count drop, follow the same link again, click a red link and an external link
 and watch nothing happen, click a citation and watch it scroll inside the
-window, reload with the race hash and land racing. Stop the server after.
+window, reload with the race hash and land racing, Reset from mid-race and
+from the win screen and land on a clean setup form with the hash gone. Stop
+the server after.
 
 ## Build and deploy
 
