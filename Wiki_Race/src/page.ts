@@ -14,6 +14,7 @@ let hopsSpan: HTMLSpanElement | null = null;
 let timeSpan: HTMLSpanElement | null = null;
 let noteEl: HTMLSpanElement | null = null;
 let pathLine: HTMLParagraphElement | null = null;
+let pathText: HTMLSpanElement | null = null;
 
 // Every navigation (follow, back, reset, new race) bumps this; an async fetch
 // whose seq no longer matches is stale and must not paint or dispatch.
@@ -64,7 +65,7 @@ let setupUi: SetupUi | null = null;
 
 function paintSetup(opts: { start?: string; end?: string } = {}): SetupUi {
   frame = null;
-  statsLine = backBtn = hopsSpan = timeSpan = noteEl = pathLine = null;
+  statsLine = backBtn = hopsSpan = timeSpan = noteEl = pathLine = pathText = null;
   raceEl.textContent = "";
   main.replaceChildren();
 
@@ -155,14 +156,18 @@ function paintRace() {
   backBtn = document.createElement("button");
   backBtn.textContent = "← Back";
   backBtn.addEventListener("click", goBack);
-  hopsSpan = document.createElement("span");
-  timeSpan = document.createElement("span");
+  hopsSpan = document.createElement("strong");
+  timeSpan = document.createElement("strong");
   noteEl = document.createElement("span");
   noteEl.className = "note";
   statsLine.append(backBtn, " ", hopsSpan, " ", timeSpan, " ", noteEl);
 
   pathLine = document.createElement("p");
   pathLine.className = "path";
+  const pathHead = document.createElement("strong");
+  pathHead.textContent = "Path: ";
+  pathText = document.createElement("span");
+  pathLine.append(pathHead, pathText);
 
   frame = document.createElement("iframe");
   frame.title = "Wikipedia article";
@@ -259,12 +264,12 @@ function paintStats() {
 // Full route on one line; once it outgrows the window, keep the newest hops
 // (the head is where the player has already been — the tail is the reference).
 function paintPath() {
-  if (!pathLine) return;
+  if (!pathLine || !pathText) return;
   const items = [...state.path];
-  pathLine.textContent = items.join(" → ");
+  pathText.textContent = items.join(" → ");
   while (pathLine.scrollWidth > pathLine.clientWidth && items.length > 2) {
     items.shift();
-    pathLine.textContent = `… ${items.join(" → ")}`;
+    pathText.textContent = `… ${items.join(" → ")}`;
   }
 }
 
