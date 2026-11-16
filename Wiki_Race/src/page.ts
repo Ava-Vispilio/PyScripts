@@ -195,6 +195,7 @@ async function followLink(linkTitle: string) {
   writeWindow(frame, article.html);
   paintStats();
   if (state.phase === "won") win();
+  else if (state.phase === "lost") lose();
 }
 
 function goBack() {
@@ -233,7 +234,7 @@ function paintTime() {
 
 function win() {
   stopTick();
-  finalMs = armedAt ? Date.now() - armedAt : 0;
+  const finalMs = armedAt ? Date.now() - armedAt : 0;
   const n = hops(state);
   const unit = n === 1 ? "hop" : "hops";
   const time = format(finalMs);
@@ -254,6 +255,14 @@ function win() {
     else input.select();
   });
   statsLine!.append(strong, " ", copyBtn, " ", input);
+}
+
+function lose() {
+  stopTick();
+  statsLine!.replaceChildren();
+  const strong = document.createElement("strong");
+  strong.textContent = `Out of hops — the cap is ${hops(state)} and "${state.end}" was never reached.`;
+  statsLine!.append(strong);
 }
 
 function writeWindow(frame: HTMLIFrameElement, html: string) {

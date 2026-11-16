@@ -1,4 +1,7 @@
-export type Phase = "setup" | "racing" | "won";
+export type Phase = "setup" | "racing" | "won" | "lost";
+
+/** A race allows at most this many hops before it is lost. */
+export const HOP_CAP = 50;
 
 export type State = {
   phase: Phase;
@@ -30,7 +33,8 @@ export function step(state: State, action: Action): State {
     case "follow": {
       if (state.phase !== "racing" || !action.title) return state;
       const path = [...state.path, action.title];
-      const phase = action.title === state.end ? "won" : "racing";
+      const phase =
+        action.title === state.end ? "won" : path.length - 1 >= HOP_CAP ? "lost" : "racing";
       return { ...state, path, armed: true, phase };
     }
     case "back": {

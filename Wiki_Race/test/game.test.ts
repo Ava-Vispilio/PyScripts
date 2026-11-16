@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { current, hops, initial, step, type State } from "../src/game";
+import { current, hops, initial, step, HOP_CAP, type State } from "../src/game";
 
 function racing(): State {
   return step(initial(), { type: "start", start: "Earth", end: "Moon" });
@@ -54,6 +54,24 @@ describe("follow", () => {
     const w = step(r, { type: "follow", title: "Moon" });
     expect(step(w, { type: "follow", title: "Earth" })).toBe(w);
   });
+
+  test("loses on the cap hop when it is not the end page", () => {
+    let s = racing();
+    for (let i = 1; i < HOP_CAP; i++) s = step(s, { type: "follow", title: `P${i}` });
+    expect(s.phase).toBe("racing");
+    expect(hops(s)).toBe(HOP_CAP - 1);
+    s = step(s, { type: "follow", title: `P${HOP_CAP}` });
+    expect(s.phase).toBe("lost");
+    expect(hops(s)).toBe(HOP_CAP);
+    expect(current(s)).toBe(`P${HOP_CAP}`);
+  });
+
+  test("the cap hop still wins when it is the end page", () => {
+    let s = racing();
+    for (let i = 1; i < HOP_CAP; i++) s = step(s, { type: "follow", title: `P${i}` });
+    s = step(s, { type: "follow", title: "Moon" });
+    expect(s.phase).toBe("won");
+  });
 });
 
 describe("back", () => {
@@ -73,5 +91,12 @@ describe("back", () => {
     expect(step(i, { type: "back" })).toBe(i);
     const w = step(r, { type: "follow", title: "Moon" });
     expect(step(w, { type: "back" })).toBe(w);
+  });
+
+  test("is dead after a loss", () => {
+    let s = racing();
+    for (let i = 0; i < HOP_CAP; i++) s = step(s, { type: "follow", title: `P${i + 1}` });
+    expect(s.phase).toBe("lost");
+    expect(step(s, { type: "back" })).toBe(s);
   });
 });
