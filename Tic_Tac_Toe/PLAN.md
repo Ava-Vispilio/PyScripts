@@ -4,18 +4,25 @@ overview: "Build Tic Tac Toe with a mode-select screen first: single player agai
 todos:
   - id: engine
     content: Add the state machine: mode-select phase, 9-cell board, turn derived from move count, win and draw detection, illegal moves as no-ops, Esc back to mode select
+    status: completed
   - id: tests
     content: Test turn order, all 8 win lines, draws, illegal placement, restart, mode-select transitions, and Esc from mid-game
+    status: completed
   - id: ai
     content: Add the unbeatable opponent as a pure minimax over the same state machine, with tests that it never loses, takes wins, and blocks threats
+    status: completed
   - id: screen
     content: Add both text screens: mode select with a cursor, and the board with per-player turn colors, cursor cell in the player's color, and the green/yellow/red status bar
+    status: completed
   - id: tui
     content: Add the ANSI terminal shell: cursor movement, one keypress per action, the 1-second opponent pause, r to restart, Esc to mode select, q to quit
+    status: completed
   - id: web
-    content: Add the static page: same text on black, click and key input, the same opponent pause, rules under the board, named test states
+    content: Add the static page: same text on black, click and key input, the same opponent pause, a dim Esc and R hint line, named test states
+    status: completed
   - id: build
     content: Add the build script: compile the terminal binary to dist/, bundle the page into docs/ with .nojekyll, ready for GitHub Pages
+    status: completed
 isProject: false
 ---
 
