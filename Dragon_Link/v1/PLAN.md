@@ -4,16 +4,16 @@ overview: "Build an unofficial Autumn Moon parody: a TypeScript state machine an
 todos:
   - id: engine
     content: Add the Autumn Moon state machine, original paytable and strips, 50 lines, and screen/frame model
-    status: pending
+    status: completed
   - id: tests
     content: Test line pays, scatters, mystery doors, Hold & Spin reset, and the 15-orb Grand
-    status: pending
+    status: completed
   - id: tui
     content: Add the ANSI renderer and a Bun compile script for a host executable
-    status: pending
+    status: completed
   - id: pages
     content: Add the browser paint, rules article fed by the paytable, and a GitHub Pages workflow
-    status: pending
+    status: completed
 isProject: false
 ---
 
