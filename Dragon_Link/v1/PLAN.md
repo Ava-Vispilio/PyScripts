@@ -35,8 +35,8 @@ flowchart LR
   screen --> web[Pages DOM]
 ```
 
-- [`src/engine/step.ts`](src/engine/step.ts) is pure: `(state, action, rng) => state`. Modes are base, free games, and Hold & Spin. Hold & Spin stores the mode to resume, so the feature can start during free games and then return.
-- [`src/engine/screen.ts`](src/engine/screen.ts) turns a state into a `Screen`: four jackpot meters, a 5×3 grid of labeled cells, credits / bet / win, a feature line, and a status line. Reel stops, mystery-door flips, and orb reveals are extra `Screen`s from [`src/engine/frames.ts`](src/engine/frames.ts), so both UIs animate by painting those frames. No `print` and no DOM in the engine.
+- [`src/engine/game.ts`](src/engine/game.ts) is pure: `step(game, action, rng)` returns the next game. Modes are base, free games, and Hold & Spin. Hold & Spin stores the mode to resume, so the feature can start during free games and then return.
+- [`src/engine/screen.ts`](src/engine/screen.ts) turns a state into a `Screen`: four jackpot meters, a 5×3 grid of labeled cells, credits / bet / win, a feature line, and a status line. Reel stops, mystery-door flips, and orb reveals are extra `Screen`s from the `frames` function in the same module, so both UIs animate by painting those frames. No `print` and no DOM in the engine.
 - [`src/tui/main.ts`](src/tui/main.ts) writes ANSI and reads keys.
 - [`src/web/main.ts`](src/web/main.ts) paints the same `Screen` as a monospace grid and renders the rules under it.
 
