@@ -1,0 +1,209 @@
+---
+name: Wiki Race
+overview: "A static speedrun over Wikipedia: one player picks a start and an end article and shares the race link, both players load it, and each races from start to end by clicking article links only. One TypeScript engine, one page, no terminal app."
+todos:
+  - id: engine
+    content: Add the state machine: setup, racing, and won phases; follow appends to the path, back pops it, hop count derived from the path length, win when the canonical title equals the end title, restart back to setup
+  - id: tests
+    content: Test follow, back, and win transitions, dead actions (follow while won, back at the start), title normalization, the race-URL codec round-trip, and that only the first follow arms the timer
+  - id: wiki
+    content: Add the Wikipedia layer: fetch articles through the REST page/html API with anonymous CORS, read the canonical title off the redirect, and classify link hrefs (article, in-page, dead)
+  - id: page
+    content: Add the page: the setup form, the article window with Back, the hop and time stats, the win screen with a copyable result, and races that load straight from the hash
+  - id: build
+    content: Add the build script: bundle the page into docs/ with .nojekyll, ready for GitHub Pages — no terminal binary this time
+  - id: pages
+    content: Add Wiki_Race to the Pages workflow folder list and the site index
+isProject: false
+---
+
+# Wiki Race
+
+A Wikipedia speedrun. One player picks a start and an end article and shares the
+race link; both players load it and click from the start article to the end
+article as fast as they can. Fewest hops and fastest time win, compared by
+pasting the result line — no server, no accounts. The web rules in
+[`../Dragon_Link/Guidelines_v1.md`](../Dragon_Link/Guidelines_v1.md) apply; the
+terminal rules do not. This game has no TUI, no `dist/` binary, and one shell.
+
+**Decision carried from planning: the window renders fetched HTML, not a live
+Wikipedia iframe.** Two walls block the iframe: Wikipedia sends
+`x-frame-options: SAMEORIGIN` (the frame would be blank on GitHub Pages), and a
+cross-origin frame cannot report its URL — so hops, the current page, win
+detection, and Back would all be impossible even if it rendered. Instead the
+page fetches the same barebones article HTML through Wikipedia's REST API
+(`en.wikipedia.org/api/rest_v1/page/html/<title>`, anonymous CORS, verified)
+and renders it wearing Wikipedia's own stylesheet. The window is the article
+and nothing else — no sidebar, no search box — so "article links only" is
+enforced by construction, not policed.
+
+**What got cut from the first plan:** no leaderboard, no live opponent state,
+no persistence, no random-pair generator. The race link is the whole contract
+between the two players.
+
+## Flow
+
+```mermaid
+flowchart TD
+  setup[Setup: start + end] -->|Start, both titles resolve| racing[Racing: start article shown, clock not armed]
+  racing -->|click an article link| hop[Path grows, first click arms the clock]
+  hop -->|title is not the end| racing
+  hop -->|title is the end| won[Won: clock stopped, result line]
+  racing -->|Back, path longer than one| back[Path shrinks]
+  back --> racing
+  racing -->|Esc| setup
+  won -->|New race| setup
+```
+
+## Shape
+
+```mermaid
+flowchart LR
+  action[Action] --> step[step]
+  step --> state[State]
+  state --> screen[Screen]
+  screen --> page[Pages DOM + fetched article]
+```
+
+- `src/game.ts` is pure: `step(state, action)` returns the next state. Phases
+  are the union `setup | racing | won` — no boolean piles. The state is the
+  start and end titles (canonical, resolved by the shell before dispatch, the
+  way Loop Song's `titled` arrives), the path (canonical titles; the current
+  page is the last one), and `armed` (the clock has started).
+  - Actions: `{ type: "start", start, end }`; `{ type: "follow", title }` — the
+    one data-carrying action, validated in `step` like Tic Tac Toe's cell: a
+    follow outside racing returns the same state. `back` pops the path and is a
+    no-op at path length one. `restart` returns to setup.
+  - **The hop count is `path.length − 1`, derived, never stored** (the Tic Tac
+    Toe turn rule). **The win check runs on every follow.**
+  - The engine never fetches and never sees a timestamp. The shell records the
+    clock when the engine first reports `armed`, exactly the way both shells
+    own the opponent's one-second pause.
+- `src/wiki.ts` is the only impure module.
+  - `fetchArticle(title)` GETs the REST `page/html` endpoint. The API 301s a
+    messy title to its canonical spelling (`/page/html/earth` →
+    `/page/html/Earth`), so the final `response.url` normalizes case,
+    underscores, and redirects for free; the article's `dc:isVersionOf` link is
+    the fallback. Returns `{ html, canonical }`.
+  - `validate(title)` is the same call for the setup form: both fields must
+    resolve before a race starts, and the end must differ from the start.
+  - `classify(href)` is pure and tested: `./Foo` and `./Foo#Bar` are article
+    links to `Foo`; `#cite_note-…` is in-page; red links (`action=edit`,
+    `redlink`), `/w/…`, and every absolute URL are dead. The REST HTML speaks
+    `./` relative hrefs; the classifier also takes `/wiki/Foo`, so a scrape
+    style change is a one-line fix.
+- `src/share.ts` is the race codec: `encode({ start, end })` builds
+  `…/Wiki_Race/#s=<start>&e=<end>`, `decode` reads it back. Round-trip tested.
+  A hash on entry starts the race cold — that is how two players load the same
+  start page with zero coordination and no server.
+- `src/page.ts` and `index.html` paint the page: black, monospace, gold title,
+  the repo standard.
+  - **The window is an iframe whose `srcdoc` is the fetched article.** A srcdoc
+    frame inherits our origin, so the page rewrites its anchors and listens to
+    clicks directly. Before injection: strip every `<script>`, `on*` attribute,
+    and `target` attribute (nothing may open a new tab); make the shipped
+    protocol-relative `<base>` absolute; prefix protocol-relative image URLs
+    with `https:`.
+  - Rewritten anchors carry `data-title` and `href="#"`, so clicks, Enter, and
+    middle-click all route through the page or go nowhere — there is no
+    navigation the page does not perform itself.
+  - Wikipedia's own stylesheet link (`/w/load.php?…`, resolved by the base to
+    en.wikipedia.org) loads on the first article; every article after that
+    paints already styled. The window looks like the Berkshire Hathaway page
+    because it is that page's HTML.
+  - An article click dispatches `follow` and fetches the next article; a dead
+    link does nothing; an in-page anchor scrolls inside the window and is not
+    a hop. A failed fetch shows a red note and changes nothing.
+  - The timer paints `mm:ss` from a one-second interval, armed when the engine
+    first reports it, stopped on `won`.
+
+## The screen
+
+```
+WIKI RACE                          Earth → Nation
+
+[ ← Back ]                    Hops: 3    Time: 01:12
+
++---------------------------------------------+
+| Earth                                       |
+|                                             |
+|   … the fetched Wikipedia article, styled   |
+|   by Wikipedia's own stylesheet, in its     |
+|   own scrollable window …                   |
++---------------------------------------------+
+```
+
+Setup, before a race exists:
+
+```
+WIKI RACE
+
+Start page: [ Earth            ]
+End page:   [ Nation           ]
+
+[ Start the race ]
+```
+
+Won:
+
+```
+WIKI RACE                          Earth → Nation
+
+Nation reached in 4 hops and 02:35
+[ Copy result ]   [ New race ]
+```
+
+- **Back un-travels.** It pops the path and the hop count drops by one: hops
+  measure the distance from the start along the current path, which is what
+  "fewest redirects" means. (Flagged as a decision — if Back should cost a hop
+  instead, it is a one-line change.)
+- **The clock starts on the first article click**, not on load, so both players
+  can load the race link, read the start page, and go when they are ready.
+- **Only article links navigate.** Blue links live; red links, external links,
+  and edit links are dead; citations and anchors scroll within the window. The
+  window has no search box and no URL bar — it cannot leave Wikipedia because
+  it is not a browser.
+- **Normalization is free.** `earth`, `Earth`, and a redirect page all land on
+  one canonical title through the redirect, so the win check is exact.
+
+## Keys
+
+Clicks are the interface. `Backspace` = Back (guarded against `event.repeat`),
+`Esc` = back to setup — the repo key map, cut down for a web-only game.
+
+## Verify
+
+`tsc --noEmit`, then `bun test`. Serve the page on 127.0.0.1 and drive it by
+hand: create Earth → Nation, watch the timer arm on the first click and not
+before, hop through articles, win and copy the result, Back and watch the hop
+count drop, follow the same link again, click a red link and an external link
+and watch nothing happen, click a citation and watch it scroll inside the
+window, reload with the race hash and land racing. Stop the server after.
+
+## Build and deploy
+
+`scripts/build.ts` matches the other games minus the compile step: `Bun.build`
+bundles `src/page.ts` into `docs/` as an IIFE with `index.html` and a
+`.nojekyll` marker. `package.json` keeps `test`, `typecheck`, and `build`; no
+`tui` script. Add `Wiki_Race` to the Pages workflow's folder list and the site
+index in the same change — the workflow names folders explicitly, so it will
+not pick the new game up on its own.
+
+## Future: the shortest path
+
+Yes, possible from a static page. The action API (`api.php`) is open to
+anonymous CORS with `origin=*`, and `prop=links` returns exactly the links a
+player may click, with `generator=links` batching 50 pages per call. Shortest
+path is a breadth-first search from the start; run it from both ends
+(`prop=linkshere` gives the reverse edges) and the frontiers meet in the
+middle. The catch is scale: popular articles sit four to six clicks apart, but
+the frontier explodes — thousands of pages deep in — so a live in-page search
+needs a progress bar, a cancel, and patience for anything but nearby pairs.
+The pragmatic first cut is a `scripts/shortest.ts` in this folder (the games'
+script pattern) that runs the same search locally, caches each frontier to
+disk, and commits the path as JSON the page can load instantly.
+
+## Commits
+
+One logical change per commit, in order: engine, tests, wiki, page, build,
+pages. Push when the session's work is done.
