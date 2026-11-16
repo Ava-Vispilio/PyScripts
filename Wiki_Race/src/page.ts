@@ -114,8 +114,11 @@ async function beginRace(startRaw: string, endRaw: string, ui: SetupUi) {
 }
 
 function cacheArticle(key: string, article: Article) {
-  cache.set(article.canonical, article);
-  if (key !== article.canonical) cache.set(key, article);
+  // Single choke point: every cached article is prepared exactly once, so
+  // writeWindow can write html as-is (and Back never re-runs the regexes).
+  const prepared = { ...article, html: prepare(article.html) };
+  cache.set(article.canonical, prepared);
+  if (key !== article.canonical) cache.set(key, prepared);
 }
 
 function startRace(start: string, end: string) {
@@ -257,7 +260,7 @@ function writeWindow(frame: HTMLIFrameElement, html: string) {
   const doc = frame.contentDocument;
   if (!doc) return;
   doc.open();
-  doc.write(prepare(html));
+  doc.write(html);
   doc.close();
   wireWindow(doc);
 }
