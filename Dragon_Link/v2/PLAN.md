@@ -54,8 +54,8 @@ flowchart LR
 
 - [`src/game.ts`](src/game.ts) is the game. `act(play, key, chance)` returns the next play. Keys are `spin`, `coinUp`, and `coinDown`. Phases are `base`, `free`, `doors`, `arm`, `hold`, and `jackpot`. Hold stores the mode to resume, so the feature can start during free games and then return. `live` and `scripted` supply the chance. The game does not print and does not touch the DOM.
 - [`src/text.ts`](src/text.ts) turns a play into text. `plain` is the uncolored screen. `picture` adds a color and a highlight on every cell. `coast` builds the frames between two plays. `ansi` and `markup` paint one picture for the terminal and the page.
-- [`src/tui.ts`](src/tui.ts) reads raw keys and writes ANSI. `q` quits.
-- [`src/page.ts`](src/page.ts) fills `#screen`, `#status`, and `#rules` in [`index.html`](index.html). Enter or Space spins. Left and Right change the coin.
+- [`src/tui.ts`](src/tui.ts) reads raw keys and writes ANSI. `q` or Ctrl-C quits; `r` or Esc resets to a fresh play.
+- [`src/page.ts`](src/page.ts) fills `#screen`, `#status`, and `#rules` in [`index.html`](index.html). Enter or Space spins. Left and Right change the coin. R or Esc resets.
 
 Bun runs the tests and the terminal. `bun build --target=browser` emits the page bundle.
 
