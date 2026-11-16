@@ -79,4 +79,9 @@ describe("prepare", () => {
     const out = prepare(`<img srcset="//upload.wikimedia.org/a.png 1x, //upload.wikimedia.org/a2.png 2x"/>`);
     expect(out).toContain("https://upload.wikimedia.org/a2.png");
   });
+
+  test("lazy-loads and async-decodes images", () => {
+    const out = prepare(`<img src="//upload.wikimedia.org/x.png" width="100"/>`);
+    expect(out).toContain('<img loading="lazy" decoding="async" src="https://upload.wikimedia.org/x.png"');
+  });
 });

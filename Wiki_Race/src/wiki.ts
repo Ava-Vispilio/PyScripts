@@ -55,6 +55,9 @@ export function prepare(html: string): string {
     .replaceAll(/\son[a-z]+\s*=\s*(?:"[^"]*"|'[^']*')/gi, "")
     .replaceAll(/\starget\s*=\s*(?:"[^"]*"|'[^']*')/gi, "")
     .replaceAll(/<base\b[^>]*>/gi, "")
+    // Below-the-fold images are most of the page weight; fetch them as the
+    // reader scrolls instead of letting them compete with the next article.
+    .replaceAll(/<img\b/gi, '<img loading="lazy" decoding="async"')
     .replaceAll('="//', '="https://')
     .replaceAll('="/', '="https://en.wikipedia.org/')
     .replaceAll(", //", ", https://");
