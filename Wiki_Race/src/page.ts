@@ -17,11 +17,29 @@ let noteEl: HTMLSpanElement | null = null;
 // Every navigation (follow, back, reset, new race) bumps this; an async fetch
 // whose seq no longer matches is stale and must not paint or dispatch.
 let seq = 0;
-let armedAt = 0;
-let finalMs = 0;
+// The clock counts only reading time: it pauses while an article is fetching,
+// so a slow connection never costs a player anything.
+let armed = false;
+let elapsedMs = 0;
+let runningSince = 0; // 0 = paused
 let tick: ReturnType<typeof setInterval> | null = null;
 
 const cache = new Map<string, Article>();
+
+function pauseClock() {
+  if (runningSince) {
+    elapsedMs += Date.now() - runningSince;
+    runningSince = 0;
+  }
+}
+
+function resumeClock() {
+  if (armed && !runningSince) runningSince = Date.now();
+}
+
+function totalMs() {
+  return elapsedMs + (runningSince ? Date.now() - runningSince : 0);
+}
 
 function format(ms: number): string {
   const s = Math.floor(ms / 1000);
@@ -174,10 +192,11 @@ async function loadCached(title: string): Promise<Article | null> {
 async function followLink(linkTitle: string) {
   if (state.phase !== "racing") return;
   const mySeq = ++seq;
-  if (!armedAt) {
-    armedAt = Date.now();
+  if (!armed) {
+    armed = true;
     startTick();
   }
+  pauseClock();
   const article = await loadCached(linkTitle);
   if (mySeq !== seq || state.phase !== "racing") return;
   if (!article || !frame) {
@@ -185,6 +204,7 @@ async function followLink(linkTitle: string) {
       noteEl.textContent = `Could not load "${linkTitle}" — try another link.`;
       noteEl.classList.add("bad");
     }
+    resumeClock();
     return;
   }
   if (noteEl) {
@@ -196,11 +216,15 @@ async function followLink(linkTitle: string) {
   paintStats();
   if (state.phase === "won") win();
   else if (state.phase === "lost") lose();
+  else resumeClock();
 }
 
 function goBack() {
   if (state.phase !== "racing" || state.path.length <= 1) return;
   seq++;
+  // Back is an instant cache hit; if a fetch was in flight (clock paused),
+  // that fetch is now stale and will never resume the clock — do it here.
+  resumeClock();
   state = step(state, { type: "back" });
   const title = current(state);
   const article = title === undefined ? undefined : cache.get(title);
@@ -211,8 +235,9 @@ function goBack() {
 function reset() {
   seq++;
   stopTick();
-  armedAt = 0;
-  finalMs = 0;
+  armed = false;
+  elapsedMs = 0;
+  runningSince = 0;
   state = initial();
   cache.clear();
   history.replaceState(null, "", location.pathname + location.search);
@@ -228,13 +253,12 @@ function paintStats() {
 
 function paintTime() {
   if (!timeSpan) return;
-  const ms = state.phase === "won" ? finalMs : armedAt ? Date.now() - armedAt : 0;
-  timeSpan.textContent = `Time: ${format(ms)}`;
+  timeSpan.textContent = `Time: ${format(totalMs())}`;
 }
 
 function win() {
   stopTick();
-  const finalMs = armedAt ? Date.now() - armedAt : 0;
+  const finalMs = totalMs();
   const n = hops(state);
   const unit = n === 1 ? "hop" : "hops";
   const time = format(finalMs);
