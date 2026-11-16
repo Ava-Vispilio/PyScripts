@@ -75,7 +75,8 @@ flowchart LR
   - **Mode select:** title, two options (`[ ONE PLAYER ]`, `[ TWO PLAYERS ]`),
     a cursor on the highlighted option, and a tip row. Arrows move, Enter chooses.
   - **Board:** title, a 3×3 grid of bracket cells `[ X ]`, the turn row, a tip row,
-    and the status bar. The selected square is highlighted in the current player's
+    and the status bar, with a dim `Esc = Back, R = Reset` hint line under the
+    bar. The selected square is highlighted in the current player's
     color before Enter places. The screen never changes height; every row is
     limited to and centered on the board width.
 - `src/tui.ts` writes ANSI and reads keys. Arrow keys move the cursor, Enter or
@@ -83,8 +84,9 @@ flowchart LR
   keypress is one action. During the opponent pause the TUI keeps reading keys —
   `Esc` still works; placing does nothing.
 - `src/page.ts` and `index.html` paint the same text on black. Keyboard input works
-  as in the terminal, and a click on a cell maps to the same `place` action. The
-  rules and the origins of the game sit under the board. `?state=` jumps to
+  as in the terminal, and a click on a cell maps to the same `place` action.
+  The page shows the screen alone — Tic Tac Toe is self-explanatory, so no
+  rules article sits under the board. `?state=` jumps to
   `select`, `xwins`, `owins`, `draw`, or `mid` for manual testing.
 - `test/game.test.ts` and `test/ai.test.ts` hold behavior tests. `tsc --noEmit`
   stays clean and `bun test` passes before the build is done.
@@ -116,7 +118,7 @@ Serve the page on 127.0.0.1 for a visual check and stop the server after.
 
 `scripts/build.ts` does what Autumn Moon v1 does: `bun build --compile` emits the
 standalone terminal binary to `dist/tic-tac-toe`, and `Bun.build` bundles the page
-into `docs/` as an IIFE with the rules inlined and a `.nojekyll` marker.
+into `docs/` as an IIFE with a `.nojekyll` marker.
 
 Pages serving: a repo with one game per folder cannot use the deploy-from-branch
 `docs/` rule, which only reads the repo root. Add a small GitHub Actions workflow
